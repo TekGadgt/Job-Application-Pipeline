@@ -1,0 +1,30 @@
+# --- Personal data (never commit; ship *.example templates instead) ---
+config/profile.md
+config/pipeline.yaml
+*.seen.sqlite
+*.seen.db
+seen_index*.sqlite
+/vault/
+# Anything a user points at their own vault/output
+output/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Editor / OS ---
+.DS_Store
+.idea/
+.vscode/
