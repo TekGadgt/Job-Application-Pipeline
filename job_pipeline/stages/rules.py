@@ -115,6 +115,7 @@ class SalaryStage:
                 job.salary_ok = False
                 job.mark_rejected("salary", "salary not listed")
             else:
+                job.salary_ok = True
                 job.add_trace("salary", "not listed; kept per profile")
             return job
         annual = job.comp_max * (HOURS_PER_YEAR if job.comp_period == "hourly" else 1)

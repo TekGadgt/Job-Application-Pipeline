@@ -99,7 +99,8 @@ def test_salary_normalizes_hourly():
 def test_salary_not_listed_keep_vs_reject():
     keep = SalaryStage(profile(salary_floor=140000, salary_not_listed="keep"))
     rej = SalaryStage(profile(salary_floor=140000, salary_not_listed="reject"))
-    assert not keep.run(make_job()).rejected
+    kept = keep.run(make_job())
+    assert not kept.rejected and kept.salary_ok is True
     assert rej.run(make_job()).rejected
 
 
