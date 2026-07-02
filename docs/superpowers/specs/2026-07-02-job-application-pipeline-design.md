@@ -18,13 +18,13 @@ The project has two goals of equal weight:
    pilot for adopting a standard agent-orchestration approach).
 
 ### In scope
-- Hybrid intake: user-fed URLs + light pulls from API-friendly sources (Greenhouse,
-  Lever, RSS).
+- Hybrid intake: manual URLs (CLI `--url` + plaintext inbox file, one URL per line) + light
+  pulls from API-friendly sources (Greenhouse, Lever, RSS).
 - Deterministic Python orchestrator; agents only where judgment is required.
-- Rule-based stages (dedup, hard-filter, location, salary) in pure Python.
+- Rule-based stages (dedup, hard-filter, fuzzy post-extract dedup, location, salary) in pure Python.
 - Agent stages (extract, skill-gap, score) via the Claude Agent SDK.
 - Publish to an Obsidian vault; each note is also a VEC work-search record.
-- Opt-in `existing_vault` source that seeds the dedup index from an existing vault.
+- Opt-in `existing_vault` seeder that pre-populates the dedup index from an existing vault.
 - Designed to be published (open-sourced) and personalized by others.
 
 ### Out of scope
@@ -39,7 +39,7 @@ The project has two goals of equal weight:
 - **Deterministic orchestrator + per-stage agents** (not Agent Teams, not all-agent).
   Agent Teams is all-Opus, heavier 5-hour-window burn, and overkill for a mostly-linear
   chain that needs no peer negotiation.
-- **"Fat code, thin agents."** 4 of 7 filtering stages never touch a model; the 3 that do
+- **"Fat code, thin agents."** 5 of 8 filtering stages never touch a model; the 3 that do
   run on progressively smaller sets at escalating model tiers (Haiku → Sonnet → Opus).
   This is the core cost strategy and the project's demonstrable "what needs AI vs not"
   decision.
@@ -57,20 +57,25 @@ The project has two goals of equal weight:
 Cheap deterministic filters run first, dropping jobs before any agent tokens are spent.
 
 ```
-INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ LOCATION ──▶ SALARY ──▶ SKILL-GAP ──▶ SCORE ──▶ PUBLISH
- (feeds +   (Python)  (Python,        (AGENT,     (Python)     (Python)   (AGENT,        (AGENT,   (Python →
-  fed URLs)            keyword scan)   Haiku)                              Sonnet)        Opus)     Obsidian)
+INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-FUZZY ──▶ LOCATION ──▶ SALARY ──▶ SKILL-GAP ──▶ SCORE ──▶ PUBLISH
+ (feeds +   (Python,  (Python,        (AGENT,     (Python,        (Python)     (Python)   (AGENT,       (AGENT,   (Python →
+  manual)    URL key)  keyword scan)   Haiku)      company+title)                          Sonnet)       Opus)     Obsidian)
 ```
 
-1. **Intake** — feeds (Greenhouse/Lever/RSS) + fed URLs + optional `existing_vault` seed → raw listings.
-2. **Dedup** (Python) — drop anything in the seen-index. Free → first.
+1. **Intake** — feeds (Greenhouse/Lever/RSS) + manual URLs (CLI `--url` and/or inbox file) → raw listings. Seeders (e.g. `existing_vault`) pre-populate the seen-index before intake.
+2. **Dedup** (Python) — drop anything in the seen-index (keyed by URL hash). Free → first.
 3. **Hard-filter** (Python) — scan *raw text* for the blocklist (crypto/web3/…) before any agent spend.
-4. **Extract** (agent, cheap) — normalize survivors → structured fields. First AI spend, smallest set.
-5. **Location** (Python) — apply remote/geo rules to the extracted location.
-6. **Salary** (Python) — apply floor to extracted comp; handle "not listed" per profile.
-7. **Skill-gap** (agent, mid) — compare résumé/skills to requirements.
-8. **Score** (agent, strong) — final fit judgment + rationale, smallest set.
-9. **Publish** (Python) — write Obsidian note (score, gap, VEC fields).
+4. **Extract** (agent, cheap) — normalize survivors → structured fields, including numeric comp
+   (`comp_min`/`comp_max`/`comp_currency`/`comp_period`). First AI spend, smallest set.
+5. **Post-extract dedup** (Python) — second, nearly-free gate: fuzzy key
+   `normalize(company) + normalize(title)` catches the same role reached via different URLs
+   (cross-source duplicates) before further agent spend.
+6. **Location** (Python) — apply remote/geo rules to the extracted location.
+7. **Salary** (Python) — compare extracted `comp_min`/`comp_max` (normalized to annual) against
+   the floor; handle "not listed" per profile.
+8. **Skill-gap** (agent, mid) — compare résumé/skills to requirements.
+9. **Score** (agent, strong) — final fit judgment + rationale, smallest set.
+10. **Publish** (Python) — write Obsidian note (score, gap, VEC fields).
 
 Every stage implements one interface, `run(job) -> job` (may mark the job rejected with a
 reason). Rejected jobs short-circuit but are logged so the user can see *why* and tune the
@@ -87,8 +92,9 @@ job_pipeline/                  # publishable framework (no personal data)
     orchestrator.py# Orchestrator protocol + DeterministicOrchestrator (default)
     runner.py      # AgentRunner interface + SDK impl + MockRunner (tests)
     registry.py    # name→Stage / name→Source registries (extensibility seam)
-  stages/          # dedup, hard_filter, extract, location, salary, skill_gap, score, publish
-  sources/         # base + rss, greenhouse, lever, manual, existing_vault
+  stages/          # dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish
+  sources/         # base + rss, greenhouse, lever, manual (CLI --url + inbox file)
+  seeders/         # base + existing_vault (pre-populates seen-index; yields no jobs)
   store/
     seen_index.py  # dedup persistence (SQLite)
     obsidian.py    # vault note writer
@@ -106,8 +112,10 @@ pyproject.toml   README.md   LICENSE
 
 1. **Config-driven pipeline** — `pipeline.yaml` lists stages by name, in order, with a model
    tier per agent stage. Add/remove/reorder = config edit.
-2. **Pluggable sources & stages via the registry** — register by name; extend by dropping in
-   an adapter, core unchanged.
+2. **Pluggable sources, stages & seeders via the registry** — three interfaces, each registered
+   by name: `Source` (yields jobs), `Stage` (`run(job) -> job`), `Seeder`
+   (`seed(seen_index) -> None`, runs before intake). Extend by dropping in an adapter, core
+   unchanged.
 3. **Personal data outside the code** — real `profile.md`, `pipeline.yaml`, vault path, and
    seen-index are gitignored; repo ships `*.example` templates.
 
@@ -152,9 +160,13 @@ Supporting requirements so the swap is truly drop-in:
 class Job:
     # intake
     source: str; url: str; raw_text: str; fetched_at: datetime
-    id: str                        # stable hash(url) → dedup key
+    id: str                        # stable hash(url) → primary dedup key
     # after extract (agent)
-    title: str; company: str; location: str; comp_text: str
+    title: str; company: str; location: str
+    comp_text: str                 # verbatim comp string, for display
+    comp_min: int | None; comp_max: int | None      # numeric, parsed by the extract agent
+    comp_currency: str | None; comp_period: str | None   # e.g. "USD", "annual" | "hourly"
+    fuzzy_key: str                 # normalize(company) + normalize(title) — cross-source dedup
     requirements: list[str]; description: str
     employer_address: str; employer_phone: str; employer_email: str   # VEC, if present
     # after rule stages
@@ -192,12 +204,19 @@ salary_not_listed: keep      # keep | reject
 sources:
   - {type: greenhouse, board: acme}
   - {type: rss, url: "https://..."}
+  - {type: manual, inbox: ~/vault/jobs/inbox.txt}   # one URL per line; consumed on run
+seeders:
   - {type: existing_vault, path: ~/vault/jobs, url_field: source_url}   # opt-in dedup seed
-stages: [dedup, hard_filter, extract, location, salary, skill_gap, score, publish]
+stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish]
 models: { extract: haiku, skill_gap: sonnet, score: opus }
 output: { vault: ~/vault/jobs, keep_rejects: true }
-limits: { max_agent_jobs_per_run: 40 }
+limits: { max_agent_jobs_per_run: 40 }   # overflow: FIFO; deferred jobs stay unseen → retry next run
 ```
+
+Manual URLs enter two ways, both handled by the `manual` source: `job-pipeline run --url <...>`
+(repeatable, one-off) and the configured **inbox file** — plaintext, one URL per line, dump links
+in from anywhere. Processed lines are removed on a successful run (the file acts as a queue);
+lines for jobs that error stay in place and retry.
 
 ### Obsidian note (publish output; frontmatter doubles as the VEC record)
 ```markdown
@@ -207,7 +226,8 @@ position: "Senior Backend Engineer"
 employer_address: "..."          # VEC
 employer_phone: "..."            # VEC (fax/email/web also captured if present)
 employer_contact_person: ""      # VEC — user fills on apply
-date_found: 2026-07-02           # VEC date of contact
+date_found: 2026-07-02           # pipeline discovery date (not a VEC contact)
+date_of_contact: ""              # VEC date of contact — user fills on apply
 source_url: "https://..."        # VEC web address
 type_of_work: "Senior Backend Engineer"   # VEC
 result_of_contact: "found"       # VEC — found → applied → interview → ...
@@ -225,17 +245,19 @@ status: to_review
 **VEC requirements captured** (verified against VEC guidance): date of contact; employer
 name, full address, phone (plus fax/email/web when available); person spoken with; type of
 work/position; result of contact. Records must be retained ≥1 year; minimum two contacts per
-week. The pipeline never fakes an application — `result_of_contact`/`status` advance only when
-the user acts. Note frontmatter is designed so an Obsidian Dataview query yields a VEC-ready
-weekly table.
+week. The pipeline never fakes an application — finding a listing is *not* a VEC contact, so
+`date_of_contact`, `employer_contact_person`, and `result_of_contact` advance only when the user
+acts (applies). Note frontmatter is designed so an Obsidian Dataview query over `date_of_contact`
+yields a VEC-ready weekly table.
 
-## 7. Existing-Vault Seeding Source
+## 7. Existing-Vault Seeder
 
-`existing_vault` is a generic, opt-in `Source` that reads a configured vault, extracts a URL
-(and/or company+title) from each note's frontmatter via a field mapping, and pre-populates the
-seen-index so already-tracked jobs are never re-surfaced. Generic and publish-safe (benefits
-anyone with an Obsidian job vault). Ryan's own legacy-note reformatting is a separate local
-step, not part of this framework.
+`existing_vault` is a generic, opt-in **`Seeder`** (`seed(seen_index) -> None`) — a third
+pluggable kind alongside `Source` and `Stage`, since it yields no jobs. It reads a configured
+vault, extracts a URL (and/or company+title fuzzy key) from each note's frontmatter via a field
+mapping, and pre-populates the seen-index before intake so already-tracked jobs are never
+re-surfaced. Generic and publish-safe (benefits anyone with an Obsidian job vault). Ryan's own
+legacy-note reformatting is a separate local step, not part of this framework.
 
 ## 8. Error Handling
 
@@ -251,17 +273,22 @@ step, not part of this framework.
 - **Seen-index integrity.** A job is marked seen only on terminal reject or successful publish;
   `errored` jobs stay unseen and retry next run (transient failures self-heal).
 - **Window-burn guard.** `limits.max_agent_jobs_per_run` caps how many jobs reach agent stages per
-  run; cheap filters still process everything.
+  run; cheap filters still process everything. Overflow is FIFO (intake order): deferred jobs are
+  not marked seen, so they retry next run, and the run summary reports the deferred count — a
+  capped run never silently looks complete.
+- **Inbox-file integrity.** The manual inbox is consumed transactionally: a line is removed only
+  when its job reaches a terminal state (published or rejected); errored/deferred lines remain.
 
 ## 9. Testing (TDD; suite uses no tokens, no network)
 
 - **Rule stages** — pure unit tests over `Job` fixtures; exhaustive edge cases (salary "not
-  listed", remote rules, blocklist word-boundaries).
+  listed", hourly→annual normalization, remote rules, blocklist word-boundaries, fuzzy-key
+  normalization for cross-source dedup).
 - **Agent stages** — `MockRunner` returns canned structured output; assert mapping onto `Job` and
   verdicts, no real calls.
 - **Orchestrator** — fake stages verify ordering, short-circuit, error isolation.
-- **Sources** — saved RSS/Greenhouse/Lever fixtures → parsed `Job` list; `existing_vault` against a
-  temp vault.
+- **Sources** — saved RSS/Greenhouse/Lever fixtures → parsed `Job` list; `manual` against a temp
+  inbox file (incl. consume-on-terminal-state); `existing_vault` seeder against a temp vault.
 - **Store** — Obsidian writer against a temp dir (incl. skip-on-edit idempotency); seen-index against
   temp SQLite.
 - **End-to-end** — fake source + `MockRunner` + temp vault → full deterministic run.
