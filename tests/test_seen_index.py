@@ -27,3 +27,17 @@ def test_empty_fuzzy_key_never_matches(tmp_path):
     idx = SeenIndex(tmp_path / "seen.sqlite")
     idx.mark("abc", "")
     assert not idx.has_fuzzy("")
+
+
+def test_remark_with_fuzzy_key_updates(tmp_path):
+    idx = SeenIndex(tmp_path / "seen.sqlite")
+    idx.mark("abc", "")
+    idx.mark("abc", "acme|engineer")
+    assert idx.has_fuzzy("acme|engineer") and idx.count() == 1
+
+
+def test_close_and_reopen(tmp_path):
+    idx = SeenIndex(tmp_path / "seen.sqlite")
+    idx.mark("abc")
+    idx.close()
+    assert idx.has_url("abc")   # lazily reconnects
