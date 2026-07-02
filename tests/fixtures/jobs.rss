@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Jobs</title>
+<item><title>Backend Engineer - Acme</title>
+<link>https://example.com/jobs/1</link>
+<description>Python backend role, remote, $150k+</description></item>
+<item><title>Web3 Wizard - ChainCo</title>
+<link>https://example.com/jobs/2</link>
+<description>Crypto trading platform</description></item>
+</channel></rss>
