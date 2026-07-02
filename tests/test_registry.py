@@ -17,7 +17,7 @@ def test_register_and_get_stage():
 
 
 def test_unknown_name_raises_keyerror_listing_known():
-    with pytest.raises(KeyError, match="demo"):
+    with pytest.raises(KeyError, match="nope"):
         get_stage("nope")
 
 
