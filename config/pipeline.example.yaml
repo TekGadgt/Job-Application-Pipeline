@@ -1,0 +1,11 @@
+sources:
+  - {type: greenhouse, board: examplecompany}
+  - {type: lever, org: examplecompany}
+  - {type: rss, url: "https://example.com/jobs.rss"}
+  - {type: manual, inbox: ~/vault/jobs/inbox.txt}   # one URL per line; consumed on run
+seeders:
+  - {type: existing_vault, path: ~/vault/jobs, url_field: source_url}
+stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish]
+models: {extract: haiku, skill_gap: sonnet, score: opus}
+output: {vault: ~/vault/jobs, keep_rejects: true}
+limits: {max_agent_jobs_per_run: 40}   # overflow: FIFO; deferred jobs retry next run
