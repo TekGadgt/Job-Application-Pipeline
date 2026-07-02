@@ -44,3 +44,12 @@ def test_score_sets_score_and_rationale():
     j = ScoreStage(r, "opus", p).run(make_job())
     assert j.score == 87.0 and j.score_rationale == "Strong match"
     assert r.calls[0][1] == "opus"
+
+
+def test_extract_tolerates_braces_in_raw_text():
+    r = MockRunner([EXTRACT_REPLY])
+    j = ExtractStage(r, "haiku").run(
+        make_job(raw_text='<script type="application/ld+json">{"@type": "JobPosting"}</script>')
+    )
+    assert j.company == "Acme"
+    assert '{"@type": "JobPosting"}' in r.calls[0][0]

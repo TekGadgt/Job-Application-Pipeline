@@ -10,6 +10,14 @@ from job_pipeline.core.runner import AgentRunner
 from job_pipeline.core.stage import StageSpec
 
 
+def _fill(template: str, **values: object) -> str:
+    """Brace-safe template fill: values may contain literal { } freely."""
+    out = template
+    for key, value in values.items():
+        out = out.replace("{" + key + "}", str(value))
+    return out
+
+
 class ExtractReply(BaseModel):
     title: str = ""
     company: str = ""
@@ -38,10 +46,10 @@ class ScoreReply(BaseModel):
 
 
 EXTRACT_PROMPT = """Extract structured fields from this job listing. Reply with ONLY a JSON object:
-{{"title": str, "company": str, "location": str, "comp_text": str,
+{"title": str, "company": str, "location": str, "comp_text": str,
  "comp_min": int|null, "comp_max": int|null, "comp_currency": str|null,
  "comp_period": "annual"|"hourly"|null, "requirements": [str], "description": str,
- "employer_address": str, "employer_phone": str, "employer_email": str}}
+ "employer_address": str, "employer_phone": str, "employer_email": str}
 comp_min/comp_max are numbers only (e.g. "$150k" -> 150000). Use "" / null / [] when absent.
 description is a 2-3 sentence summary.
 
@@ -49,7 +57,7 @@ LISTING:
 {raw_text}"""
 
 SKILL_GAP_PROMPT = """Compare this candidate against the job requirements. Reply with ONLY a JSON object:
-{{"have": [str], "missing": [str], "partial": [str]}}
+{"have": [str], "missing": [str], "partial": [str]}
 
 CANDIDATE PROFILE:
 {profile_body}
@@ -61,7 +69,7 @@ JOB DESCRIPTION:
 {description}"""
 
 SCORE_PROMPT = """Score this job 0-100 for fit against the candidate's profile and preferences.
-Reply with ONLY a JSON object: {{"score": number, "rationale": str}}
+Reply with ONLY a JSON object: {"score": number, "rationale": str}
 The rationale should be 2-4 sentences naming the decisive factors.
 
 CANDIDATE PROFILE AND PREFERENCES:
@@ -84,7 +92,7 @@ class ExtractStage:
 
     def run(self, job: Job) -> Job:
         reply = self.runner.run(
-            EXTRACT_PROMPT.format(raw_text=job.raw_text), self.model, ExtractReply
+            _fill(EXTRACT_PROMPT, raw_text=job.raw_text), self.model, ExtractReply
         )
         for field_name, value in reply.model_dump().items():
             setattr(job, field_name, value)
@@ -103,7 +111,8 @@ class SkillGapStage:
 
     def run(self, job: Job) -> Job:
         reply = self.runner.run(
-            SKILL_GAP_PROMPT.format(
+            _fill(
+                SKILL_GAP_PROMPT,
                 profile_body=self.profile.body,
                 requirements=job.requirements,
                 description=job.description,
@@ -127,7 +136,8 @@ class ScoreStage:
 
     def run(self, job: Job) -> Job:
         reply = self.runner.run(
-            SCORE_PROMPT.format(
+            _fill(
+                SCORE_PROMPT,
                 profile_body=self.profile.body,
                 title=job.title, company=job.company, location=job.location,
                 comp_text=job.comp_text, description=job.description,
