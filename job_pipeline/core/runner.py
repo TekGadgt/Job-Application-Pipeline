@@ -21,10 +21,9 @@ class AgentRunner(Protocol):
 def parse_json_reply(text: str) -> dict:
     """Extract a JSON object from a model reply, tolerating ```json fences."""
     stripped = text.strip()
-    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", stripped, re.DOTALL)
-    candidate = fence.group(1) if fence else stripped
+    stripped = re.sub(r"^```(?:json)?\s*\n?|\n?```\s*$", "", stripped).strip()
     try:
-        return json.loads(candidate)
+        return json.loads(stripped)
     except json.JSONDecodeError as e:
         raise RunnerError(f"model reply was not valid JSON: {e}") from e
 

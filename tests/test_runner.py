@@ -27,3 +27,9 @@ def test_parse_json_reply_strips_code_fences():
 def test_parse_json_reply_raises_on_garbage():
     with pytest.raises(RunnerError):
         parse_json_reply("not json")
+
+
+def test_parse_json_reply_handles_nested_objects_in_fences():
+    assert parse_json_reply('```json\n{"a": {"b": 1}, "c": [1, 2]}\n```') == {
+        "a": {"b": 1}, "c": [1, 2],
+    }
