@@ -24,7 +24,7 @@ class ManualSource:
 
     def fetch(self) -> list[Job]:
         inbox_urls = self._read_inbox()
-        self._inbox_urls = set(inbox_urls)
+        self._inbox_urls |= set(inbox_urls)
         jobs = []
         for url in [*inbox_urls, *self.urls]:
             job = Job(source="manual", url=url, raw_text="", fetched_at=datetime.now(UTC))
@@ -37,6 +37,8 @@ class ManualSource:
 
     def on_terminal(self, job: Job) -> None:
         """Remove the job's line from the inbox once it is published or rejected."""
+        if job.errored:
+            return   # errored lines stay in the inbox and retry next run
         if not self.inbox or job.url not in self._inbox_urls:
             return
         lines = [ln for ln in self._read_inbox() if ln != job.url]

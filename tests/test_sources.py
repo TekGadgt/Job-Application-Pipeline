@@ -58,3 +58,27 @@ def test_manual_fetch_error_marks_job_errored(tmp_path):
     src._get = boom
     jobs = src.fetch()
     assert jobs[0].errored and "connection refused" in jobs[0].error
+
+
+def test_on_terminal_never_removes_errored_job_line(tmp_path):
+    inbox = tmp_path / "inbox.txt"
+    inbox.write_text("https://a.com/1\n")
+    src = ManualSource(inbox=inbox, urls=[])
+    def boom(url):
+        raise OSError("dead")
+    src._get = boom
+    jobs = src.fetch()
+    src.on_terminal(jobs[0])                 # errored — must be a no-op
+    assert inbox.read_text().strip() == "https://a.com/1"
+
+
+def test_second_fetch_does_not_orphan_prior_inbox_jobs(tmp_path):
+    inbox = tmp_path / "inbox.txt"
+    inbox.write_text("https://a.com/1\n")
+    src = ManualSource(inbox=inbox, urls=[])
+    src._get = lambda url: "text"
+    first = src.fetch()
+    inbox.write_text("https://a.com/1\nhttps://a.com/2\n")
+    src.fetch()
+    src.on_terminal(first[0])                # from the FIRST fetch
+    assert inbox.read_text().strip() == "https://a.com/2"
