@@ -54,3 +54,21 @@ def test_rejected_jobs_do_not_consume_agent_cap():
     jobs = [make_job(i) for i in range(3)]
     result = DeterministicOrchestrator(max_agent_jobs=1).run(jobs, [rejecter, agent])
     assert result.deferred == []          # nobody reached the agent stage
+
+
+def test_errored_job_short_circuits_later_stages():
+    def boom(job):
+        raise ValueError("kapow")
+    bad = FakeStage("bad", action=boom)
+    after = FakeStage("after")
+    DeterministicOrchestrator().run([make_job(1)], [bad, after])
+    assert after.seen == []
+
+
+def test_rerunning_same_jobs_does_not_corrupt_cap():
+    agent = FakeStage("agent", kind="agent")
+    jobs = [make_job(i) for i in range(2)]
+    orch = DeterministicOrchestrator(max_agent_jobs=2)
+    r1 = orch.run(jobs, [agent])
+    r2 = orch.run(r1.processed, [agent])   # reuse the same Job objects
+    assert len(r2.processed) == 2 and r2.deferred == []
