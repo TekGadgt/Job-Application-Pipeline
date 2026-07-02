@@ -1,6 +1,7 @@
 """Fail-fast config loading: profile.md (YAML frontmatter + prose) and pipeline.yaml."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -41,13 +42,18 @@ class PipelineConfig(BaseModel):
     limits: Limits = Limits()
 
 
+FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.DOTALL)
+
+
 def load_profile(path: Path | str) -> Profile:
     text = Path(path).read_text()
-    if not text.startswith("---"):
-        raise ValueError(f"{path}: profile must start with YAML frontmatter (---)")
-    _, fm, body = text.split("---", 2)
-    data = yaml.safe_load(fm) or {}
-    return Profile(**data, body=body.strip())
+    m = FRONTMATTER_RE.match(text)
+    if not m:
+        raise ValueError(
+            f"{path}: profile must start with a closed YAML frontmatter block (--- ... ---)"
+        )
+    data = yaml.safe_load(m.group(1)) or {}
+    return Profile(**data, body=m.group(2).strip())
 
 
 def load_pipeline_config(path: Path | str) -> PipelineConfig:

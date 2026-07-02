@@ -63,3 +63,17 @@ def test_pipeline_config_rejects_negative_cap(tmp_path):
     p.write_text(PIPELINE.replace("40", "-1"))
     with pytest.raises(ValidationError):
         load_pipeline_config(p)
+
+
+def test_profile_body_may_contain_horizontal_rules(tmp_path):
+    p = tmp_path / "profile.md"
+    p.write_text(PROFILE + "\n---\n\nMore resume text after a rule.")
+    prof = load_profile(p)
+    assert "More resume text after a rule." in prof.body
+
+
+def test_profile_unclosed_frontmatter_raises_clear_error(tmp_path):
+    p = tmp_path / "profile.md"
+    p.write_text("---\nsalary_floor: 1\nno closing delimiter")
+    with pytest.raises(ValueError, match="frontmatter"):
+        load_profile(p)
