@@ -3,6 +3,15 @@ sources:
   - {type: lever, org: examplecompany}
   - {type: rss, url: "https://example.com/jobs.rss"}
   - {type: manual, inbox: ~/vault/jobs/inbox.txt}   # one URL per line; consumed on run
+  # Loosely formatted feed — HN "Who is hiring?" (uncomment to enable):
+  # - type: rss
+  #   url: "https://hnrss.org/whoishiring/jobs"
+  #   extract_hint: >
+  #     This is a free-form Hacker News "Who is hiring?" comment, not a formal
+  #     posting. Conventions: REMOTE/ONSITE/HYBRID flags, "Company | Role |
+  #     Location" pipe-separated first lines, salary often absent. If one
+  #     comment advertises several roles, extract the single best-matching role
+  #     and mention the others in the description.
 seeders:
   - {type: existing_vault, path: ~/vault/jobs, url_field: source_url}
 stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish]
