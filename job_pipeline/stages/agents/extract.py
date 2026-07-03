@@ -29,7 +29,7 @@ class ExtractReply(BaseModel):
     employer_email: str = ""
 
 
-EXTRACT_PROMPT = """Extract structured fields from this job listing. Reply with ONLY a JSON object:
+EXTRACT_PROMPT = """{source_context}Extract structured fields from this job listing. Reply with ONLY a JSON object:
 {"title": str, "company": str, "location": str, "comp_text": str,
  "comp_min": int|null, "comp_max": int|null, "comp_currency": str|null,
  "comp_period": "annual"|"hourly"|null, "requirements": [str], "description": str,
@@ -52,8 +52,12 @@ class ExtractStage:
         self.runner, self.model = runner, model
 
     def run(self, job: Job) -> Job:
+        source_context = (
+            f"SOURCE CONTEXT: {job.extract_hint}\n\n" if job.extract_hint else ""
+        )
         reply = self.runner.run(
-            _fill(EXTRACT_PROMPT, raw_text=job.raw_text), self.model, ExtractReply
+            _fill(EXTRACT_PROMPT, source_context=source_context, raw_text=job.raw_text),
+            self.model, ExtractReply,
         )
         for field_name, value in reply.model_dump().items():
             setattr(job, field_name, value)

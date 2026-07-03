@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from job_pipeline.core.job import Job
 from job_pipeline.sources.manual import ManualSource
 from job_pipeline.sources.feeds import RssSource, GreenhouseSource, LeverSource
 
@@ -82,3 +83,24 @@ def test_second_fetch_does_not_orphan_prior_inbox_jobs(tmp_path):
     src.fetch()
     src.on_terminal(first[0])                # from the FIRST fetch
     assert inbox.read_text().strip() == "https://a.com/2"
+
+
+def test_hinted_source_stamps_hint_and_delegates_terminal():
+    from datetime import datetime, UTC
+    from job_pipeline.sources.base import HintedSource
+
+    class RecordingSource:
+        def __init__(self):
+            self.terminal = []
+        def fetch(self):
+            return [Job(source="t", url="https://x.com/1", raw_text="r",
+                        fetched_at=datetime.now(UTC))]
+        def on_terminal(self, job):
+            self.terminal.append(job.url)
+
+    inner = RecordingSource()
+    src = HintedSource(inner, "HINT TEXT")
+    jobs = src.fetch()
+    assert jobs[0].extract_hint == "HINT TEXT"
+    src.on_terminal(jobs[0])
+    assert inner.terminal == ["https://x.com/1"]      # delegated, not swallowed

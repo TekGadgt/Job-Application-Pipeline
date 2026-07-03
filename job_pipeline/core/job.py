@@ -14,6 +14,7 @@ class Job:
     raw_text: str
     fetched_at: datetime
     id: str = ""                       # stable hash(url) — primary dedup key
+    extract_hint: str = ""             # per-source hint prepended to the extract prompt
     # after extract (agent)
     title: str = ""
     company: str = ""

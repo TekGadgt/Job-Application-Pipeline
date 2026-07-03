@@ -116,6 +116,28 @@ Your real `config/profile.md`, `config/pipeline.yaml`, vault path, and seen-inde
 
 `AgentRunner` is also swappable (SDK / mock / future `claude -p`) behind the same interface.
 
+### Loosely formatted feeds (e.g. HN "Who is hiring?")
+
+Some feeds aren't clean ATS postings. The Hacker News "Who is hiring?" RSS feed,
+for example, is free-form comments. Add an `extract_hint` to any source and it is
+prepended to the extract prompt for every job from that source — no per-source
+code needed:
+
+```yaml
+sources:
+  - type: rss
+    url: "https://hnrss.org/whoishiring/jobs"
+    extract_hint: >
+      This is a free-form Hacker News "Who is hiring?" comment, not a formal
+      posting. Conventions: REMOTE/ONSITE/HYBRID flags, "Company | Role |
+      Location" pipe-separated first lines, salary often absent. If one
+      comment advertises several roles, extract the single best-matching role
+      and mention the others in the description.
+```
+
+`extract_hint` is optional and valid on any source type. Without it, prompts are
+unchanged.
+
 ## VEC Note Semantics
 
 Each published Obsidian note doubles as a Virginia Employment Commission (VEC) work-search record. The pipeline populates what it can from the listing (employer name, address, phone, position, source URL, discovery date). **Two fields you fill in yourself when you act:**

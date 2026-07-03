@@ -68,3 +68,20 @@ def test_fill_leaves_json_braces_and_unknown_tokens_intact():
     template = 'Reply with {"title": str}\nX: {known} Y: {unknown}'
     out = _fill(template, known="v")
     assert out == 'Reply with {"title": str}\nX: v Y: {unknown}'
+
+
+def test_extract_prepends_source_context_when_hint_present():
+    r = MockRunner([EXTRACT_REPLY])
+    # Hint contains a brace token to pin brace-safe composition (verbatim, no splice).
+    ExtractStage(r, "haiku").run(make_job(extract_hint="HN comment; fields like {company}"))
+    prompt = r.calls[0][0]
+    assert prompt.startswith("SOURCE CONTEXT: HN comment; fields like {company}\n\n")
+    assert "Senior Eng at Acme" in prompt        # raw_text still present
+
+
+def test_extract_omits_source_context_when_no_hint():
+    r = MockRunner([EXTRACT_REPLY])
+    ExtractStage(r, "haiku").run(make_job())      # no hint
+    prompt = r.calls[0][0]
+    assert "SOURCE CONTEXT" not in prompt
+    assert prompt.startswith("Extract structured fields from this job listing.")
