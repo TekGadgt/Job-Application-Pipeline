@@ -8,7 +8,7 @@
 
 1. Every terminal outcome (published/rejected/errored) is logged with its reason and persisted to a queryable run history.
 2. Extraction that produces no real content marks the job **errored** (retryable), never rejected (terminal).
-3. CLI commands answer "what happened?" (`log`) and "why this URL?" (`why`) after the fact, and `--reprocess` un-marks a URL for a re-run.
+3. CLI commands answer "what happened?" (`log`) and "why this URL?" (`why`) after the fact. (Their natural companion, `--reprocess`, is extracted to its own standalone spec — 2026-07-03-reprocess-flag-design.md — so it can ship earlier.)
 
 This is the data layer the future local server/UI spec (2026-07-03) reads; it must be useful standalone from the terminal.
 
@@ -64,8 +64,7 @@ CREATE INDEX IF NOT EXISTS run_jobs_url_hash ON run_jobs(url_hash);
 ### 4. CLI commands (cli.py)
 
 - `job-pipeline log [--last N]` (default 5): recent runs — id, started_at, counts — then per-job lines for the most recent run (outcome, stage, reason, url).
-- `job-pipeline why <url>`: hash the url, print every `run_jobs` row for it (newest first) with outcome/stage/reason and the decoded trace; also say whether the url is currently in the seen index.
-- `job-pipeline run --url <u> --reprocess`: before fetching, delete the seen-index row(s) for the given `--url` values so terminal-marked URLs can be re-run deliberately. `--reprocess` without `--url` is an error (no blanket un-marking).
+- `job-pipeline why <url>`: hash the url, print every `run_jobs` row for it (newest first) with outcome/stage/reason and the decoded trace; also say whether the url is currently in the seen index. (`--reprocess` is specced separately — 2026-07-03-reprocess-flag-design.md — and may already exist when this lands; if so, `why`'s output should mention it as the escape hatch.)
 
 Both new commands need only `--config` (to locate the db via the vault path).
 
@@ -78,7 +77,7 @@ Run history supersedes the never-implemented reject-notes idea. `output.keep_rej
 - Extract guard: empty title+location → errored, trace shows extract error, publishable fields untouched; title present + empty location → proceeds (location stage's job to judge).
 - RunHistory: run row opened/closed with correct counts; one row per job incl. deferred; trace round-trips JSON; `why`-style query by url_hash returns newest-first.
 - run_pipeline integration (MockRunner): rejected job produces a run_jobs row with stage+reason matching `mark_rejected`; errored job is recorded but not seen-marked (existing invariant, now asserted against history too).
-- CLI: `log` and `why` output against a seeded tmp db (golden substrings, not full-text asserts); `--reprocess` deletes the right row and the job re-processes; `--reprocess` without `--url` exits non-zero with a clear message.
+- CLI: `log` and `why` output against a seeded tmp db (golden substrings, not full-text asserts).
 - Logging: caplog asserts the rejected/errored lines.
 
 ## Non-Goals
