@@ -53,3 +53,18 @@ def test_extract_tolerates_braces_in_raw_text():
     )
     assert j.company == "Acme"
     assert '{"@type": "JobPosting"}' in r.calls[0][0]
+
+
+def test_fill_does_not_resubstitute_placeholders_inside_values():
+    from job_pipeline.stages.agents import _fill
+    # A malicious/unlucky listing containing a placeholder token must not
+    # have other values (e.g. the resume) substituted into it.
+    out = _fill("A: {a}\nB: {b}", a="contains {b} literally", b="RESUME")
+    assert out == "A: contains {b} literally\nB: RESUME"
+
+
+def test_fill_leaves_json_braces_and_unknown_tokens_intact():
+    from job_pipeline.stages.agents import _fill
+    template = 'Reply with {"title": str}\nX: {known} Y: {unknown}'
+    out = _fill(template, known="v")
+    assert out == 'Reply with {"title": str}\nX: v Y: {unknown}'

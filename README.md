@@ -105,9 +105,10 @@ Register a new adapter by name; core code is unchanged.
 Each stage lives in its own module — deterministic filters under
 `job_pipeline/stages/rules/`, agent stages under `job_pipeline/stages/agents/`.
 To write your own, copy the closest existing one as a template
-(`stages/rules/location.py` for a filter, `stages/agents/skill_gap.py` for an
-agent stage), register it with `@register_stage("your_name")`, and add the name
-to `stages:` in `pipeline.yaml`.
+(`job_pipeline/stages/rules/location.py` for a filter,
+`job_pipeline/stages/agents/skill_gap.py` for an agent stage), register it with
+`@register_stage("your_name")`, and add the name to `stages:` in
+`config/pipeline.yaml`.
 
 ### 3. Personal data outside the repo
 
