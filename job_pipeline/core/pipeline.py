@@ -10,6 +10,7 @@ from job_pipeline.core.job import Job
 from job_pipeline.core.orchestrator import DeterministicOrchestrator
 from job_pipeline.core.registry import get_seeder, get_source, get_stage
 from job_pipeline.core.runner import AgentRunner
+from job_pipeline.sources.base import HintedSource
 from job_pipeline.store.obsidian import ObsidianWriter
 from job_pipeline.store.seen_index import SeenIndex
 
@@ -59,10 +60,12 @@ def build_sources(cfg: PipelineConfig, extra_urls: list[str] | None = None):
     for spec in cfg.sources:
         spec = dict(spec)
         kind = spec.pop("type")
+        hint = spec.pop("extract_hint", "")
         if kind == "manual":
             spec["urls"] = extra_urls or []
             manual_seen = True
-        sources.append(get_source(kind)(**spec))
+        source = get_source(kind)(**spec)
+        sources.append(HintedSource(source, hint) if hint else source)
     if extra_urls and not manual_seen:
         sources.append(get_source("manual")(urls=extra_urls))
     return sources
