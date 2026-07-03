@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LocationRules(BaseModel):
@@ -40,6 +40,17 @@ class PipelineConfig(BaseModel):
     models: dict[str, str] = {}
     output: OutputConfig
     limits: Limits = Limits()
+
+    # A yaml key whose entries are all commented out parses as None, not empty.
+    @field_validator("sources", "seeders", mode="before")
+    @classmethod
+    def _none_as_empty_list(cls, v: object) -> object:
+        return [] if v is None else v
+
+    @field_validator("models", mode="before")
+    @classmethod
+    def _none_as_empty_dict(cls, v: object) -> object:
+        return {} if v is None else v
 
 
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.DOTALL)

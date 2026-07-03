@@ -34,7 +34,11 @@ Every stage implements one interface, `run(job) -> job`. Rejected jobs short-cir
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
+source .venv/bin/activate        # fish: source .venv/bin/activate.fish
 ```
+
+Activating the venv puts `job-pipeline` on your PATH. If you prefer not to activate
+(e.g. in a cron job), invoke it as `.venv/bin/job-pipeline` instead.
 
 Copy the example configs and fill them in:
 
@@ -62,8 +66,8 @@ claude login   # or: claude   # already logged in if you use Claude Code
 ### Run the pipeline
 
 ```bash
-job-pipeline run                      # full run from configured sources
-job-pipeline run --url https://...    # one-off URL (repeatable; works with sources too)
+job-pipeline run                      # full run from configured sources + inbox
+job-pipeline run --url https://...    # process ONLY this URL (repeatable); sources/inbox skipped
 job-pipeline run --mock               # dry run using MockRunner — no tokens spent
 job-pipeline run --url https://... --mock   # test a specific URL without spending tokens
 ```

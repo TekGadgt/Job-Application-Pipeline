@@ -77,3 +77,21 @@ def test_profile_unclosed_frontmatter_raises_clear_error(tmp_path):
     p.write_text("---\nsalary_floor: 1\nno closing delimiter")
     with pytest.raises(ValueError, match="frontmatter"):
         load_profile(p)
+
+
+def test_pipeline_config_treats_commented_out_sections_as_empty(tmp_path):
+    # yaml parses a key with all entries commented out as None, not []
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(
+        "sources:\n"
+        "#  - {type: rss, url: 'https://example.com/feed'}\n"
+        "seeders:\n"
+        "#  - {type: existing_vault, path: /tmp/vault}\n"
+        "models:\n"
+        "stages: [dedup]\n"
+        "output: {vault: /tmp/vault}\n"
+    )
+    cfg = load_pipeline_config(p)
+    assert cfg.sources == []
+    assert cfg.seeders == []
+    assert cfg.models == {}

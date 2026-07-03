@@ -15,7 +15,8 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run the pipeline once")
     run.add_argument("--config", type=Path, default=Path("config/pipeline.yaml"))
     run.add_argument("--profile", type=Path, default=Path("config/profile.md"))
-    run.add_argument("--url", action="append", default=[], help="feed a job URL (repeatable)")
+    run.add_argument("--url", action="append", default=[],
+                     help="process only this URL (repeatable; configured sources are skipped)")
     run.add_argument("--force", action="store_true", help="overwrite user-edited notes")
     run.add_argument("--mock", action="store_true", help="dry run with a mock agent")
     args = parser.parse_args(argv)
@@ -31,7 +32,13 @@ def main(argv: list[str] | None = None) -> int:
         from job_pipeline.core.sdk_runner import SDKRunner
         runner = SDKRunner()
 
-    s = run_pipeline(cfg, profile, runner, extra_urls=args.url, force=args.force)
+    # --url means "process exactly these": skip configured sources (and the inbox)
+    sources = None
+    if args.url:
+        from job_pipeline.sources.manual import ManualSource
+        sources = [ManualSource(urls=args.url)]
+
+    s = run_pipeline(cfg, profile, runner, sources=sources, force=args.force)
     print(f"published={s.published} rejected={s.rejected} "
           f"errored={s.errored} deferred={s.deferred}")
     for note in s.notes:
