@@ -102,6 +102,13 @@ Three interfaces, each registered by name:
 
 Register a new adapter by name; core code is unchanged.
 
+Each stage lives in its own module — deterministic filters under
+`job_pipeline/stages/rules/`, agent stages under `job_pipeline/stages/agents/`.
+To write your own, copy the closest existing one as a template
+(`stages/rules/location.py` for a filter, `stages/agents/skill_gap.py` for an
+agent stage), register it with `@register_stage("your_name")`, and add the name
+to `stages:` in `pipeline.yaml`.
+
 ### 3. Personal data outside the repo
 
 Your real `config/profile.md`, `config/pipeline.yaml`, vault path, and seen-index are gitignored. The repo ships `*.example` templates — publish-safe from day one.
