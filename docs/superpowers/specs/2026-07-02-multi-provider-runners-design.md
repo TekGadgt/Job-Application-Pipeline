@@ -82,9 +82,19 @@ ModelChain([(MockRunner([...]), "haiku")])
 - Instantiate each provider **lazily and once per run**: only providers referenced by some stage's chain get constructed, with kwargs from `cfg.runners.get(provider, {})`.
 - `run_pipeline`'s `runner: AgentRunner` parameter becomes `runner_override: AgentRunner | None = None`. When set (tests, `--mock`), every chain entry uses it regardless of provider — this keeps `--mock` and the e2e tests trivial. When `None`, providers come from the registry.
 
-### 7. SDKRunner registration
+### 7. Provider layout: the `runners/` package (binding)
 
-`@register_runner("claude")` on the existing class. The `ANTHROPIC_API_KEY` billing guard stays exactly as-is — it protects the `claude` provider only; other providers own their own credential handling. `MockRunner` registers as `"mock"` (usable directly in yaml chains, e.g. for dry-run configs).
+Providers get the same predictable one-module-per-adapter layout as stages/sources/seeders:
+
+```
+job_pipeline/runners/
+  __init__.py     # imports every provider module (registration side-effect), __all__
+  claude.py       # SDKRunner moves here from core/sdk_runner.py, @register_runner("claude")
+  mock.py         # registers MockRunner as "mock" (class itself stays in core/runner.py —
+                  #   it is a test double first; this module is just the registration)
+```
+
+`core/sdk_runner.py` is removed (no shim — same clean-break policy as the source module split; `tests/test_sdk_runner.py` updates its import line, the only permitted test edit). The `ANTHROPIC_API_KEY` billing guard moves verbatim with the class — it protects the `claude` provider only; other providers own their own credential handling. `MockRunner` as `"mock"` is usable directly in yaml chains (e.g. dry-run configs). A fork adds a provider the same way it adds anything: copy `runners/claude.py` as the template, register a name, add one import line to `runners/__init__.py`, reference it as `provider:` in a model chain.
 
 ### 8. CLI
 

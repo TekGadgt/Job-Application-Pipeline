@@ -49,6 +49,10 @@ Existing deep imports (`from job_pipeline.sources.base import HintedSource`, `fr
 - Full suite passes with only the single permitted import-line edit in `tests/test_sources.py`.
 - README "Pluggable sources" section gains the copy-me pointer, mirroring the stages paragraph: copy `job_pipeline/sources/greenhouse.py` as the template (it shows fetch + field mapping in ~20 lines), register with `@register_source("your_name")`, add an import line to `sources/__init__.py`, reference it by `type:` in `config/pipeline.yaml`.
 
+## Seeders: same aggregator convention (binding — small third task)
+
+`job_pipeline/seeders/` is already one-module-per-seeder, but the wiring predates the convention: `seeders/__init__.py` is empty and `core/pipeline.py` imports `job_pipeline.seeders.existing_vault` directly — so adding a seeder means editing core, contradicting the registry's purpose. Fix exactly as for sources: `seeders/__init__.py` imports every seeder module (registration side-effect) and re-exports `ExistingVaultSeeder` with `__all__`; `pipeline.py`'s side-effect import collapses to `import job_pipeline.seeders`. README seeder bullet gains the same one-liner: add your module, add one import line to `__init__.py`.
+
 ## Coordination
 
 - **Scrape-source spec** (2026-07-02) and **js-fallback-fetcher spec** (2026-07-03) both add modules under `sources/` — they land naturally in this layout (`scrape.py`, `fetch.py`); neither needs amendment, but this split should land **before** them so they're born into the final structure.
