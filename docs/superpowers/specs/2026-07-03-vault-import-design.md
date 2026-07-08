@@ -21,18 +21,17 @@ A top-level `import:` block in `pipeline.yaml` (reviewable, repeatable — not o
 import:
   path: ~/Documents/old-job-tracker      # folder of old notes (recursive)
   fields:                                # pipeline-canonical <- old frontmatter key
+    company: company
     position: position
     application_status: status
     date_of_contact: date-applied
     source_url: website
-  company_from: filename                 # filename | <frontmatter key>. Default: "company"
   keep_unmapped: true                    # default true: carry unrecognized old keys through
 ```
 
-- `fields` maps **canonical pipeline frontmatter keys** (left) to **old-note keys** (right). Only mappable canonicals are accepted (unknown left-hand keys fail at load, naming the key): `company`, `position`, `type_of_work`, `source_url`, `date_found`, `date_of_contact`, `employer_address`, `employer_phone`, `employer_email`, `employer_contact_person`, `result_of_contact`, `application_status`, `score`.
-- Missing old keys per note are fine (templates evolve): the canonical gets its normal default.
-- `company_from: filename` uses the old note's stem as the company (Ryan's vault pattern); any other value is treated as a frontmatter key.
-- `keep_unmapped: true` appends old keys that weren't consumed by any mapping (and aren't pipeline-canonical) to the new frontmatter verbatim (`has-referral`, `salary-expectation`, wiki-linked `resume`, …) — data is never silently dropped. `false` drops them.
+- `fields` maps **canonical pipeline frontmatter keys** (left) to **old-note keys** (right). Only mappable canonicals are accepted (unknown left-hand keys fail at load, naming the key): `company`, `position`, `type_of_work`, `source_url`, `date_found`, `date_of_contact`, `employer_address`, `employer_phone`, `employer_email`, `employer_contact_person`, `result_of_contact`, `application_status`, `score`. A canonical whose old key equals it (`company: company`) is legal and common — the map is the complete, explicit contract; nothing is inferred from filenames or conventions.
+- Missing old keys per note are fine (templates evolve): the canonical gets its normal default. Notes the user considers not worth normalizing are simply deleted or left outside `path` — the importer is deliberately unopinionated about any particular vault's shape.
+- `keep_unmapped: true` appends old keys that weren't consumed by any mapping (and aren't pipeline-canonical) to the new frontmatter verbatim (`has-referral`, `salary-expectation`, wiki-linked `resume`, …) — data is never silently dropped, and future pipeline features can adopt these fields later with zero migration friction. `false` drops them.
 
 ## Import Behavior
 
@@ -53,7 +52,7 @@ Per old note (recursive `**/*.md` under `path`):
 ## Testing (no network, no tokens)
 
 - Config: `import:` block parses; unknown canonical in `fields` fails at load naming the key; block absent → `import` command exits non-zero with a clear message.
-- Mapping: old-shaped fixture (Ryan's template, anonymized) → new note with mapped `application_status`/`date_of_contact`/`position`; missing old keys → defaults; `company_from: filename`; `keep_unmapped` both ways.
+- Mapping: old-shaped fixture (anonymized, evolved-template style) → new note with mapped `company`/`application_status`/`date_of_contact`/`position`; missing old keys → defaults; `keep_unmapped` both ways.
 - Identity/idempotence: URL note keyed by URL-hash; URL-less note keyed by relative-path-hash; second run imports nothing new; existing target skipped.
 - Seen-index: URL row and fuzzy row marked appropriately; URL-less+company-less note marks nothing but still imports.
 - Body preservation byte-exact; `status: imported` protects via existing `is_user_touched`.

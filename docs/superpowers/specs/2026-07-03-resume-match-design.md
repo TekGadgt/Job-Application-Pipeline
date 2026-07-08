@@ -16,14 +16,18 @@ An **optional** agent stage, `resume_match`, that weighs a set of labeled resume
 
 ```yaml
 resumes:
-  devex:  {file: devex.md,  covers: "Forward Deployed Engineer, Developer Success Engineer"}
-  devrel: {file: devrel.md, covers: "Developer Advocate"}
-  ic:     {file: ic.md,     covers: "All IC roles, e.g. Senior Software Engineer"}
+  devex:  {file: devex.md,  covers: "Forward Deployed Engineer, Developer Success Engineer",
+           link: resume_pdfs/devex/resume.pdf}
+  devrel: {file: devrel.md, covers: "Developer Advocate",
+           link: resume_pdfs/devrel/resume.pdf}
+  ic:     {file: ic.md,     covers: "All IC roles, e.g. Senior Software Engineer",
+           link: resume_pdfs/ic/resume.pdf}
 ```
 
 - Keys are the labels used everywhere downstream (frontmatter, notes, prompts).
 - `file` resolves **relative to profile.md's parent folder** (absolute paths also allowed); each file is a plain markdown resume — a real document you also actually send.
 - `covers` is a short free-text routing description shown to the agent.
+- `link` (optional) is the **vault-internal path of the deliverable resume** (typically the PDF you actually submit) as Obsidian resolves it. Never read by the pipeline, never sent to the agent — it exists solely so published notes can wiki-link the recommended resume (see Publish). Absent → no link rendered, everything else unchanged.
 - Loaded fail-fast in `load_profile`: a missing/unreadable resume file raises `ValueError` naming the label and resolved path. `resumes:` absent → `{}`, today's behavior.
 - The profile **body is unchanged** in meaning: general background + preferences, still the only profile input to `skill_gap` and `score`.
 
@@ -44,6 +48,7 @@ Canonical position: after `skill_gap` (its output is an input here), before `sco
 class ResumeRef(BaseModel):
     file: str
     covers: str = ""
+    link: str = ""      # vault-internal path to the deliverable (PDF); publish-only
     body: str = ""      # populated by load_profile, never from yaml
 
 class Profile(BaseModel):
@@ -92,7 +97,8 @@ Prompt (frozen constant, filled via `_fill`): job title/company/location/descrip
 Only when `job.resume_match` is non-empty (stage ran):
 
 - Frontmatter gains `recommended_resume: <label>` and `resume_submitted: ""` — the latter user-filled when you actually apply, mirroring the VEC `date_of_contact` pattern, so your records show which resume went out.
-- Body gains a `## Resume Match` section: one line per rating (`- **devex** (72/100): <reason>`), the recommendation, and — when `custom_suggested` — a `> [!tip] Consider a tailored resume` callout containing `custom_advice`.
+- When the recommended resume has a `link`, frontmatter also gains `recommended_resume_link: "[[<link>|<label>]]"` — the same wiki-link convention as a hand-maintained tracker, clickable straight to the PDF. `recommended_resume` stays the bare label (Dataview-friendly); the link is a separate key, omitted when `link` is unset. (`resume_submitted` remains free text; paste the wikilink there if you submitted a different one.)
+- Body gains a `## Resume Match` section: one line per rating (`- **devex** (72/100): <reason>`), the recommendation — rendered as `[[<link>|<label>]]` when a link is configured, bare label otherwise — and, when `custom_suggested`, a `> [!tip] Consider a tailored resume` callout containing `custom_advice`.
 
 When the stage didn't run, notes are **byte-identical to today** (existing publish tests unchanged).
 
@@ -105,9 +111,9 @@ When the stage didn't run, notes are **byte-identical to today** (existing publi
 ## Testing (no network, no tokens)
 
 - Profile loading: relative + absolute `file` resolution; `body` populated; missing file raises naming label and path; absent `resumes:` → `{}` and existing profile fixtures still load.
-- Stage: MockRunner reply → fields set, trace added; prompt contains every label, `covers`, and full resume bodies; unknown `recommended` falls back to highest-rated valid label with correction trace; empty `profile.resumes` → `ValueError` at construction.
+- Stage: MockRunner reply → fields set, trace added; prompt contains every label, `covers`, and full resume bodies — and never any `link` value; unknown `recommended` falls back to highest-rated valid label with correction trace; empty `profile.resumes` → `ValueError` at construction.
 - Wiring: `build_stages` constructs the stage from `models["resume_match"]`; stage listed without `resumes:` in profile fails at build, not mid-run.
-- Publish: with `resume_match` populated → frontmatter keys + section rendered (including the custom-advice callout); without → note byte-identical to current fixtures.
+- Publish: with `resume_match` populated → frontmatter keys + section rendered (including the custom-advice callout); recommended resume with `link` → `recommended_resume_link` wikilink key + linked body line, without `link` → no link key, bare label; without `resume_match` → note byte-identical to current fixtures.
 - e2e: full MockRunner run with the stage in the list → published note carries the recommendation.
 
 ## Acceptance
