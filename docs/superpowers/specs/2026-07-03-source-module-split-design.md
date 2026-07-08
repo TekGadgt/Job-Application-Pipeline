@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-03
 **Status:** Approved for planning
-**Scope:** Mechanical refactor, sibling of the stage package refactor (2026-07-02, shipped): one registered source per module, so every pluggable kind (stages, sources, seeders) follows the same predictable copy-me layout.
+**Scope:** Mechanical refactor, sibling of the stage package refactor (2026-07-02, shipped): one registered source per module, so every pluggable kind (stages, sources, seeders) follows the same predictable copy-me layout. Plus one deliberate non-mechanical companion: hardening `RssSource.fetch` (see "RSS hardening") — the only behavior change in this spec, isolated to its own task so the split itself stays verbatim.
 
 ## Goal
 
@@ -18,7 +18,16 @@ job_pipeline/sources/
   manual.py          # ManualSource (already one-per-file; unchanged)
 ```
 
-Each module carries exactly its class, verbatim-moved — no logic edits.
+Each module carries exactly its class, verbatim-moved — no logic edits during the split itself. RSS hardening (below) happens as a separate follow-up task against the new `rss.py`, so the move and the behavior change are independently reviewable.
+
+## RSS hardening (binding — second task, after the split)
+
+Context: feedparser normalizes RSS 2.0 `<description>` and Atom `<summary>` onto `entry.summary`, so the current field choice is not wrong — but `RssSource.fetch` has two real gaps:
+
+1. **Truncated-content preference.** Feeds using Atom `<content>` or RSS `content:encoded` carry the full post in `entry.content[0].value` while `summary` is often a truncated teaser; we currently always take `summary`. New behavior: per entry, use `content[0].value` when present and non-empty, else `summary`, else `""`. A truncated listing silently degrades the extract agent's output — this is a quality fix, not a style one.
+2. **Crash-proof entry iteration.** `e.link` is attribute access; a single link-less entry raises `AttributeError` inside the comprehension and kills the *whole feed's* fetch for that run. New behavior: `e.get("link", "")`; entries with no link are skipped (they can't be deduped or fetched) with one `log.warning` naming the feed URL and skip count.
+
+`raw_text` composition stays `f"{title}\n{body}"`. Tests (fixture-driven, no network, added in the hardening task): a `content:encoded` fixture where content ≠ summary asserts content wins; a summary-only fixture asserts unchanged behavior; a fixture with one link-less entry among valid ones asserts the valid entries survive and the skip is logged.
 
 ## One deliberate difference from the stage refactor (binding)
 
@@ -47,10 +56,10 @@ Existing deep imports (`from job_pipeline.sources.base import HintedSource`, `fr
 
 ## Testing
 
-No new tests. The gate is the existing suite green with only the one import-line diff under `tests/`, plus the whole-plan smoke check: `python -c "import job_pipeline.sources; from job_pipeline.core.registry import get_source; [get_source(k) for k in ('rss','greenhouse','lever','manual')]"`.
+Split task: no new tests — the gate is the existing suite green with only the one import-line diff under `tests/`, plus the whole-plan smoke check: `python -c "import job_pipeline.sources; from job_pipeline.core.registry import get_source; [get_source(k) for k in ('rss','greenhouse','lever','manual')]"`. Hardening task: the three fixture-driven tests specified in "RSS hardening".
 
 ## Non-Goals
 
-- No behavior/docstring changes beyond one-line module docstrings.
+- No behavior/docstring changes in the split task beyond one-line module docstrings (the RSS hardening task is the sole, explicitly-scoped exception).
 - No splitting of `base.py` (protocol + shared HTTP helpers + HintedSource is a cohesive unit at this size).
 - No seeder split (`existing_vault.py` is already one-per-file; the pattern already holds there).
