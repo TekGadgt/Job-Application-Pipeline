@@ -4,15 +4,9 @@ All 15 open specs (in `docs/superpowers/specs/`) bundled into 8 implementation b
 Each batch = one branch → one plan (`docs/superpowers/plans/`) → subagent-driven build → one PR.
 Ordering rule: a batch starts only when the batches it's **blocked by** have merged.
 
-Execution order: **A → B → C → D → E → F → G → H** (value-first, then structure, then the fan-out).
+Execution order: **B → C → D → E → F → G → H** (value-first, then structure, then the fan-out).
 
-## Batch A — Run hygiene *(unblocked)*
-Fixes the things biting daily runs.
-- `2026-07-09-location-aware-fuzzy-dedup` — `company|title|location` keys; legacy 2-part rows keep blocking all locations
-- `2026-07-09-score-floor` — rule stage between `score` and `publish`; `score_floor` in profile
-- `2026-07-03-reprocess-flag` — `run --url <u> --reprocess`; `SeenIndex.unmark`
-
-## Batch B — Vault output *(unblocked)*
+## Batch B — Vault output *(unblocked — next up)*
 Everything that lands in notes; one golden-test rebase for all three.
 - `2026-07-03-comp-in-notes` — comp frontmatter keys + `## Compensation` section
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
@@ -45,3 +39,4 @@ Built together: scrape's detail fetches use the fetcher seam.
 - `2026-07-02-job-application-pipeline-design` — core pipeline (merged)
 - `2026-07-02-stage-package-refactor` — PR #1 (merged)
 - `2026-07-02-extract-hints` — PR #2 (merged)
+- **Batch A — Run hygiene** — PR #3 (merged 2026-07-09): location-aware fuzzy dedup (`2026-07-09-location-aware-fuzzy-dedup`), `score_floor` stage (`2026-07-09-score-floor`), `--reprocess` flag (`2026-07-03-reprocess-flag`); plan `2026-07-09-batch-a-run-hygiene`
