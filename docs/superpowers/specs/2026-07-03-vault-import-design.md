@@ -41,7 +41,7 @@ Per old note (recursive `**/*.md` under `path`):
 2. Build the pipeline frontmatter: canonical defaults → overlaid with mapped values → `status: imported` (NOT `to_review` — historical notes must never look untriaged, and skip-on-edit's `status != "to_review"` check permanently protects them from any future republish) → `application_status` defaulting to `Unsubmitted` only when unmapped/absent.
 3. **Identity:** `job_id` = sha256 of `source_url` when present (identical derivation to `Job`), else sha256 of the old note's vault-relative path (stable across re-runs). Note filename uses the existing `path_for` slug scheme.
 4. **Body preserved verbatim** below the new frontmatter (VEC blocks and all). No AI summarization, no restructuring — zero tokens is a hard property of this command.
-5. **Seen-index marked:** URL row when `source_url` present; fuzzy key when company+title resolve (same `make_fuzzy_key`, same "|"-guard as the seeder). This is why a fully imported vault no longer needs the `existing_vault` seeder pointed at the old folder.
+5. **Seen-index marked:** URL row when `source_url` present; fuzzy key when company+title resolve — 3-part `make_fuzzy_key(company, title, location)` when `location` is mapped and present, else `legacy_fuzzy_key(company, title)` (block-everywhere), with the same both-empty guard as the seeder. This is why a fully imported vault no longer needs the `existing_vault` seeder pointed at the old folder.
 6. **Idempotent/non-destructive:** if the target note path already exists, skip it (report count). Never overwrites, no `--force` (deliberate: import is additive; fixing an import means deleting the generated note and re-running).
 7. Summary line: `imported=N skipped_existing=N skipped_unparseable=N seen_marked=N`.
 
