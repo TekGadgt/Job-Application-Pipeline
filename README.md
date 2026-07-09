@@ -18,7 +18,7 @@ INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-F
 2. **Dedup** (Python) — drop anything in the seen-index (keyed by URL hash).
 3. **Hard-filter** (Python) — scan raw text for the blocklist before any agent spend.
 4. **Extract** (agent, Haiku) — normalize survivors → structured fields including numeric comp (`comp_min`/`comp_max`/`comp_currency`/`comp_period`).
-5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title)` catches the same role via different URLs.
+5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title) + normalize(location)` catches the same role via different URLs, while the same role listed separately per location is treated as distinct. Location is free text, so a repost with a reworded location can slip through as a duplicate note — deliberately: a duplicate note costs seconds of triage, a falsely-deduped posting is an application never made.
 6. **Location** (Python) — apply remote/geo rules to the extracted location.
 7. **Salary** (Python) — compare extracted comp (normalized to annual) against the floor; handle "not listed" per profile.
 8. **Skill-gap** (agent, Sonnet) — compare résumé/skills to requirements.

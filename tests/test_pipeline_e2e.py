@@ -72,3 +72,32 @@ def test_second_run_dedups_everything(tmp_path):
     src2 = FakeSource([job("https://x.com/1", "listing")])
     summary = run_pipeline(cfg, prof, MockRunner([]), sources=[src2], db_path=db)
     assert summary.rejected == 1 and summary.published == 0   # dedup, zero agent calls
+
+
+def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
+    cfg = make_cfg(tmp_path)
+    prof = Profile(salary_floor=100000, blocklist=["web3"], body="Python dev",
+                   locations=LocationRules(remote=True, allowed_metros=["New York"]))
+    db = tmp_path / "seen.sqlite"
+
+    def extract(loc):
+        return {"title": "Forward Deployed Engineer", "company": "LiveKit",
+                "location": loc, "comp_text": "$150k", "comp_min": 150000,
+                "comp_max": 150000, "comp_currency": "USD", "comp_period": "annual",
+                "requirements": ["python"], "description": "d"}
+
+    gap = {"have": ["python"], "missing": [], "partial": []}
+    score = {"score": 90.0, "rationale": "great"}
+
+    # Run 1: same role in two locations -> both publish
+    run1 = FakeSource([job("https://x.com/a", "listing a"), job("https://x.com/b", "listing b")])
+    s1 = run_pipeline(cfg, prof, MockRunner(
+        [extract("Remote"), gap, score, extract("New York, NY"), gap, score]),
+        sources=[run1], db_path=db)
+    assert s1.published == 2 and s1.rejected == 0
+
+    # Run 2: repost of the Remote role under a third URL -> fuzzy dedup rejects
+    run2 = FakeSource([job("https://x.com/c", "listing c")])
+    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote")]),
+                      sources=[run2], db_path=db)
+    assert s2.published == 0 and s2.rejected == 1

@@ -48,16 +48,48 @@ def test_hard_filter_records_which_keyword():
 
 # --- fuzzy key + fuzzy dedup ---
 def test_make_fuzzy_key_normalizes():
-    assert make_fuzzy_key("Acme, Inc.", "Sr. Engineer") == "acmeinc|srengineer"
+    assert make_fuzzy_key("Acme, Inc.", "Sr. Engineer") == "acmeinc|srengineer|"
+    assert make_fuzzy_key("Acme, Inc.", "Sr. Engineer", "Remote (US)") == "acmeinc|srengineer|remoteus"
+
+
+def test_legacy_fuzzy_key_is_two_part():
+    from job_pipeline.stages.rules import legacy_fuzzy_key
+    assert legacy_fuzzy_key("Acme, Inc.", "Sr. Engineer") == "acmeinc|srengineer"
 
 
 def test_fuzzy_dedup_rejects_cross_source_duplicate(tmp_path):
     idx = SeenIndex(tmp_path / "s.sqlite")
-    idx.mark("otherhash", "acme|engineer")
-    j = make_job(company="Acme", title="Engineer")
+    idx.mark("otherhash", "acme|engineer|remote")
+    j = make_job(company="Acme", title="Engineer", location="Remote")
     out = FuzzyDedupStage(idx).run(j)
     assert out.rejected and out.reject_stage == "dedup_fuzzy"
-    assert j.fuzzy_key == "acme|engineer"
+    assert j.fuzzy_key == "acme|engineer|remote"
+
+
+def test_fuzzy_dedup_passes_same_role_different_location(tmp_path):
+    idx = SeenIndex(tmp_path / "s.sqlite")
+    idx.mark("otherhash", "acme|engineer|remote")
+    out = FuzzyDedupStage(idx).run(
+        make_job(company="Acme", title="Engineer", location="New York, NY"))
+    assert not out.rejected
+    assert out.fuzzy_key == "acme|engineer|newyorkny"
+
+
+def test_fuzzy_dedup_legacy_row_blocks_all_locations(tmp_path):
+    # Rows written before location-aware keys hold the 2-part form and
+    # keep blocking the role everywhere.
+    idx = SeenIndex(tmp_path / "s.sqlite")
+    idx.mark("oldhash", "acme|engineer")
+    out = FuzzyDedupStage(idx).run(
+        make_job(company="Acme", title="Engineer", location="Berlin"))
+    assert out.rejected and out.reject_stage == "dedup_fuzzy"
+
+
+def test_fuzzy_dedup_no_key_when_company_and_title_empty(tmp_path):
+    idx = SeenIndex(tmp_path / "s.sqlite")
+    out = FuzzyDedupStage(idx).run(make_job(company="", title="", location="Remote"))
+    assert not out.rejected
+    assert out.fuzzy_key == ""
 
 
 # --- location ---
