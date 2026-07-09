@@ -1,6 +1,6 @@
 # Resume Match Stage — Design Spec
 
-**Date:** 2026-07-03
+**Date:** 2026-07-03 (revised 2026-07-09: publish-gated position + master resume inventory)
 **Status:** Approved for planning
 **Motivation:** Ryan maintains several role-targeted resumes (DevEx, DevRel, IC). "Which resume do I send?" is a per-application decision the pipeline already has all the inputs for: the extracted job, the skill gap, and the resumes themselves. This stage answers it in the published note.
 
@@ -31,14 +31,24 @@ resumes:
 - Loaded fail-fast in `load_profile`: a missing/unreadable resume file raises `ValueError` naming the label and resolved path. `resumes:` absent → `{}`, today's behavior.
 - The profile **body is unchanged** in meaning: general background + preferences, still the only profile input to `skill_gap` and `score`.
 
+### Master resume inventory (added 2026-07-09, optional)
+
+```yaml
+resume_master: master.md      # optional; the superset of resume entries/bullets you could claim
+```
+
+- A plain markdown file (same relative-to-profile resolution, same fail-fast loading; absent key → feature off) holding the **master list of resume content**: every entry/bullet across all roles, the superset the labeled resumes curate from.
+- **Read by `resume_match` only.** It is deliberately NOT part of the profile body — the body feeds `skill_gap` (sonnet) and `score` (opus) on every surviving job, and the full inventory would tax every job to benefit only publish-bound ones. Keeping it a separate file scopes its cost to this stage.
+- What it buys: when no labeled resume fits well, `custom_advice` must cite **specific entries from the master list** ("lead with the GKE migration bullet; include both DevRel talks") instead of generic emphasis advice. With no `resume_master`, advice stays free-form as before.
+
 ### pipeline.yaml
 
 ```yaml
-stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, resume_match, score, publish]
+stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, score_floor, resume_match, publish]
 models: {extract: haiku, skill_gap: sonnet, resume_match: sonnet, score: opus}
 ```
 
-Canonical position: after `skill_gap` (its output is an input here), before `score`. The example yaml ships with `resume_match` **commented out** in both lines.
+Canonical position (**revised 2026-07-09**): **immediately before `publish`**, after `score` and `score_floor` when present. Rationale: this stage carries the pipeline's largest prompt (every labeled resume in full), and nothing downstream consumes its output except publish — so only jobs that will actually land in the vault should pay for it. Its inputs (`title`, `description`, `skill_gap`) are all available at any post-skill_gap position, so the late placement costs nothing. The example yaml ships with `resume_match` **commented out** in both lines.
 
 ## Design
 
@@ -54,9 +64,11 @@ class ResumeRef(BaseModel):
 class Profile(BaseModel):
     ...
     resumes: dict[str, ResumeRef] = {}
+    resume_master: str = ""          # file path from frontmatter
+    resume_master_body: str = ""     # populated by load_profile
 ```
 
-`load_profile` reads each `file` and fills `body`. Label order in the mapping is preserved (dicts are ordered) and used for prompt rendering.
+`load_profile` reads each `file` and fills `body` (and `resume_master_body` when `resume_master` is set — same fail-fast on a missing file). Label order in the mapping is preserved (dicts are ordered) and used for prompt rendering.
 
 ### 2. Job fields (core/job.py)
 
@@ -85,10 +97,11 @@ class ResumeMatchReply(BaseModel):
     ratings: list[ResumeFit]
     recommended: str
     custom_suggested: bool = False
-    custom_advice: str = ""        # 2-3 bullets: what a tailored resume should emphasize
+    custom_advice: str = ""        # 2-3 bullets: what a tailored resume should emphasize;
+                                   #   cites master-inventory entries when resume_master is set
 ```
 
-Prompt (frozen constant, filled via `_fill`): job title/company/location/description, the skill-gap dict, then each resume rendered as `### <label> (covers: <covers>)` followed by its full body. Instructions: rate every resume 0-100 for *this job*, pick the best label, and if none fits well (all ratings below ~60) set `custom_suggested` with concrete advice. Full resume texts are sent — sonnet-tier cost, only on jobs that survived every free filter; summarization is premature optimization at personal volume.
+Prompt (frozen constant, filled via `_fill`): job title/company/location/description, the skill-gap dict, then each resume rendered as `### <label> (covers: <covers>)` followed by its full body; when `resume_master` is configured, a final `### MASTER INVENTORY` section with its full body and the instruction that `custom_advice` must name specific inventory entries. Instructions: rate every resume 0-100 for *this job*, pick the best label, and if none fits well (all ratings below ~60) set `custom_suggested` with concrete advice. Full texts are sent — sonnet-tier cost, and (per the revised position) only on jobs already bound for the vault; summarization is premature optimization at personal volume.
 
 **Defensive validation in `run`:** if `reply.recommended` is not a configured label, fall back to the highest-rated valid label and add a trace noting the correction (`"agent recommended unknown label X; using Y"`). Never errors the job over a mislabel. `job.resume_match` stores `reply.model_dump()`; `job.recommended_resume` stores the (validated) label. Trace: `("resume_match", "recommended <label>")`.
 
@@ -105,12 +118,15 @@ When the stage didn't run, notes are **byte-identical to today** (existing publi
 ## Coordination With In-Flight Specs
 
 - **Multi-provider runners** (2026-07-02): whichever lands first, the other adapts mechanically — this stage's constructor follows the prevailing agent-stage convention.
+- **Score floor** (2026-07-09): soft dependency — the canonical position is after `score_floor` when that stage is listed; without it, directly after `score`. Neither spec blocks the other.
 - **Observability** (2026-07-03): `run_jobs` rows need no schema change; the recommendation is visible in the note and in `Job.trace`.
 - **Local server/UI** (2026-07-03): recommended resume can surface in the job drill-down later; no change to that spec now.
 
 ## Testing (no network, no tokens)
 
-- Profile loading: relative + absolute `file` resolution; `body` populated; missing file raises naming label and path; absent `resumes:` → `{}` and existing profile fixtures still load.
+- Profile loading: relative + absolute `file` resolution; `body` populated; missing file raises naming label and path; absent `resumes:` → `{}` and existing profile fixtures still load; `resume_master` loading + fail-fast, absent → `""`.
+- Master inventory: configured → prompt contains the `MASTER INVENTORY` section and its body; not configured → prompt contains neither (byte-stable against the pre-master prompt).
+- Position: e2e with `score_floor` rejecting a job asserts the resume_match runner was never called for it (MockRunner call count) — the publish-gating property, not just the stage order.
 - Stage: MockRunner reply → fields set, trace added; prompt contains every label, `covers`, and full resume bodies — and never any `link` value; unknown `recommended` falls back to highest-rated valid label with correction trace; empty `profile.resumes` → `ValueError` at construction.
 - Wiring: `build_stages` constructs the stage from `models["resume_match"]`; stage listed without `resumes:` in profile fails at build, not mid-run.
 - Publish: with `resume_match` populated → frontmatter keys + section rendered (including the custom-advice callout); recommended resume with `link` → `recommended_resume_link` wikilink key + linked body line, without `link` → no link key, bare label; without `resume_match` → note byte-identical to current fixtures.
