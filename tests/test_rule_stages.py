@@ -138,3 +138,28 @@ def test_salary_not_listed_keep_vs_reject():
 
 def test_salary_no_floor_always_passes():
     assert not SalaryStage(profile()).run(make_job()).rejected
+
+
+# --- score floor ---
+def test_score_floor_rejects_below_floor():
+    from job_pipeline.stages.rules import ScoreFloorStage
+    out = ScoreFloorStage(profile(score_floor=60)).run(make_job(score=42.0))
+    assert out.rejected and out.reject_stage == "score_floor"
+    assert "42.0" in out.reject_reason and "60" in out.reject_reason
+
+
+def test_score_floor_boundary_is_inclusive_keep():
+    from job_pipeline.stages.rules import ScoreFloorStage
+    assert not ScoreFloorStage(profile(score_floor=60)).run(make_job(score=60.0)).rejected
+
+
+def test_score_floor_no_floor_passes():
+    from job_pipeline.stages.rules import ScoreFloorStage
+    assert not ScoreFloorStage(profile()).run(make_job(score=1.0)).rejected
+
+
+def test_score_floor_no_score_passes_with_trace():
+    from job_pipeline.stages.rules import ScoreFloorStage
+    out = ScoreFloorStage(profile(score_floor=60)).run(make_job())
+    assert not out.rejected
+    assert any("no score present" in verdict for _, verdict, _ in out.trace)

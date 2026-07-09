@@ -1,5 +1,6 @@
 ---
 salary_floor: 100000
+# score_floor: 60        # optional: reject scored jobs below this (terminal — see README)
 locations:
   remote: true
   allowed_metros: ["Richmond, VA"]

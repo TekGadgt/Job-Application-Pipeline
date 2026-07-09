@@ -16,6 +16,7 @@ class LocationRules(BaseModel):
 
 class Profile(BaseModel):
     salary_floor: int | None = None
+    score_floor: int | None = None
     locations: LocationRules = LocationRules()
     blocklist: list[str] = []
     must_have_skills: list[str] = []

@@ -92,6 +92,12 @@ models: {extract: haiku, skill_gap: sonnet, score: opus}
 
 Add, remove, or reorder stages with a config edit.
 
+One optional stage ships disabled: add `score_floor` between `score` and `publish`
+(with `score_floor: 60` in `profile.md`) to keep below-floor jobs out of your vault.
+A score-floor rejection is terminal — the URL is marked seen and won't be re-scored,
+and raising the floor later doesn't resurrect past rejects (re-run one deliberately
+with `--reprocess`).
+
 ### 2. Pluggable sources, stages, and seeders via the registry
 
 Three interfaces, each registered by name:

@@ -101,3 +101,24 @@ def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
     s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote")]),
                       sources=[run2], db_path=db)
     assert s2.published == 0 and s2.rejected == 1
+
+
+def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):
+    cfg = make_cfg(tmp_path)
+    cfg.stages = ["dedup", "hard_filter", "extract", "dedup_fuzzy",
+                  "location", "salary", "skill_gap", "score", "score_floor", "publish"]
+    prof = make_profile()
+    prof.score_floor = 60
+    db = tmp_path / "seen.sqlite"
+    src = FakeSource([job("https://x.com/low", "ok listing")])
+    summary = run_pipeline(cfg, prof, MockRunner([
+        {"title": "T", "company": "C", "location": "Remote", "comp_text": "$150k",
+         "comp_min": 150000, "comp_max": 150000, "comp_currency": "USD",
+         "comp_period": "annual", "requirements": [], "description": "d"},
+        {"have": [], "missing": [], "partial": []},
+        {"score": 42.0, "rationale": "weak"},
+    ]), sources=[src], db_path=db)
+    assert summary.rejected == 1 and summary.published == 0
+    assert summary.notes == []
+    from job_pipeline.store.seen_index import SeenIndex
+    assert SeenIndex(db).count() == 1        # terminal: marked seen

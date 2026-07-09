@@ -5,6 +5,7 @@ from job_pipeline.stages.rules.dedup_fuzzy import FuzzyDedupStage
 from job_pipeline.stages.rules.hard_filter import HardFilterStage
 from job_pipeline.stages.rules.location import LocationStage
 from job_pipeline.stages.rules.salary import SalaryStage
+from job_pipeline.stages.rules.score_floor import ScoreFloorStage
 
 __all__ = [
     "HOURS_PER_YEAR",
@@ -15,4 +16,5 @@ __all__ = [
     "HardFilterStage",
     "LocationStage",
     "SalaryStage",
+    "ScoreFloorStage",
 ]
