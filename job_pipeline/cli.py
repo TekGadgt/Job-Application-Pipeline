@@ -17,12 +17,26 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--profile", type=Path, default=Path("config/profile.md"))
     run.add_argument("--url", action="append", default=[],
                      help="process only this URL (repeatable; configured sources are skipped)")
+    run.add_argument("--reprocess", action="store_true",
+                     help="clear the seen-index entry for each --url before running")
     run.add_argument("--force", action="store_true", help="overwrite user-edited notes")
     run.add_argument("--mock", action="store_true", help="dry run with a mock agent")
     args = parser.parse_args(argv)
 
+    if args.reprocess and not args.url:
+        parser.error("--reprocess requires --url (no blanket un-marking)")
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     cfg = load_pipeline_config(args.config)      # fail fast, before any tokens
+
+    if args.reprocess:
+        import hashlib
+        from job_pipeline.store.seen_index import SeenIndex
+        seen = SeenIndex(cfg.output.vault.expanduser() / ".job_pipeline.seen.sqlite")
+        for url in args.url:
+            was = seen.unmark(hashlib.sha256(url.encode()).hexdigest()[:16])
+            logging.info("reprocessing %s (%s)", url, "was seen" if was else "was not seen")
+        seen.close()
     profile = load_profile(args.profile)
 
     if args.mock:

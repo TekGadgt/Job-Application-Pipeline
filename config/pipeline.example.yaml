@@ -14,6 +14,7 @@ sources:
   #     and mention the others in the description.
 seeders:
   - {type: existing_vault, path: ~/vault/jobs, url_field: source_url}
+# optional stage: add score_floor between score and publish (set score_floor in profile.md)
 stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish]
 models: {extract: haiku, skill_gap: sonnet, score: opus}
 output: {vault: ~/vault/jobs, keep_rejects: true}

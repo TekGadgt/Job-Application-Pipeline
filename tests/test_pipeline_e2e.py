@@ -72,3 +72,78 @@ def test_second_run_dedups_everything(tmp_path):
     src2 = FakeSource([job("https://x.com/1", "listing")])
     summary = run_pipeline(cfg, prof, MockRunner([]), sources=[src2], db_path=db)
     assert summary.rejected == 1 and summary.published == 0   # dedup, zero agent calls
+
+
+def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
+    cfg = make_cfg(tmp_path)
+    prof = Profile(salary_floor=100000, blocklist=["web3"], body="Python dev",
+                   locations=LocationRules(remote=True, allowed_metros=["New York"]))
+    db = tmp_path / "seen.sqlite"
+
+    def extract(loc):
+        return {"title": "Forward Deployed Engineer", "company": "LiveKit",
+                "location": loc, "comp_text": "$150k", "comp_min": 150000,
+                "comp_max": 150000, "comp_currency": "USD", "comp_period": "annual",
+                "requirements": ["python"], "description": "d"}
+
+    gap = {"have": ["python"], "missing": [], "partial": []}
+    score = {"score": 90.0, "rationale": "great"}
+
+    # Run 1: same role in two locations -> both publish
+    run1 = FakeSource([job("https://x.com/a", "listing a"), job("https://x.com/b", "listing b")])
+    s1 = run_pipeline(cfg, prof, MockRunner(
+        [extract("Remote"), gap, score, extract("New York, NY"), gap, score]),
+        sources=[run1], db_path=db)
+    assert s1.published == 2 and s1.rejected == 0
+
+    # Run 2: repost of the Remote role under a third URL -> fuzzy dedup rejects
+    run2 = FakeSource([job("https://x.com/c", "listing c")])
+    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote")]),
+                      sources=[run2], db_path=db)
+    assert s2.published == 0 and s2.rejected == 1
+
+
+def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):
+    cfg = make_cfg(tmp_path)
+    cfg.stages = ["dedup", "hard_filter", "extract", "dedup_fuzzy",
+                  "location", "salary", "skill_gap", "score", "score_floor", "publish"]
+    prof = make_profile()
+    prof.score_floor = 60
+    db = tmp_path / "seen.sqlite"
+    src = FakeSource([job("https://x.com/low", "ok listing")])
+    summary = run_pipeline(cfg, prof, MockRunner([
+        {"title": "T", "company": "C", "location": "Remote", "comp_text": "$150k",
+         "comp_min": 150000, "comp_max": 150000, "comp_currency": "USD",
+         "comp_period": "annual", "requirements": [], "description": "d"},
+        {"have": [], "missing": [], "partial": []},
+        {"score": 42.0, "rationale": "weak"},
+    ]), sources=[src], db_path=db)
+    assert summary.rejected == 1 and summary.published == 0
+    assert summary.notes == []
+    from job_pipeline.store.seen_index import SeenIndex
+    assert SeenIndex(db).count() == 1        # terminal: marked seen
+
+
+def test_unmark_lets_a_seen_url_republish(tmp_path):
+    cfg, prof = make_cfg(tmp_path), make_profile()
+    db = tmp_path / "seen.sqlite"
+    replies = [
+        {"title": "T", "company": "C", "location": "Remote", "comp_text": "$150k",
+         "comp_min": 150000, "comp_max": 150000, "comp_currency": "USD",
+         "comp_period": "annual", "requirements": [], "description": "d"},
+        {"have": [], "missing": [], "partial": []},
+        {"score": 90.0, "rationale": "ok"},
+    ]
+    url = "https://x.com/1"
+    s1 = run_pipeline(cfg, prof, MockRunner(list(replies)),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s1.published == 1
+    s2 = run_pipeline(cfg, prof, MockRunner([]),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s2.rejected == 1                      # dedup: seen
+    from job_pipeline.store.seen_index import SeenIndex
+    import hashlib
+    SeenIndex(db).unmark(hashlib.sha256(url.encode()).hexdigest()[:16])
+    s3 = run_pipeline(cfg, prof, MockRunner(list(replies)),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s3.published == 1                     # reprocessed successfully

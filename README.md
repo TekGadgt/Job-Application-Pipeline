@@ -18,7 +18,7 @@ INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-F
 2. **Dedup** (Python) — drop anything in the seen-index (keyed by URL hash).
 3. **Hard-filter** (Python) — scan raw text for the blocklist before any agent spend.
 4. **Extract** (agent, Haiku) — normalize survivors → structured fields including numeric comp (`comp_min`/`comp_max`/`comp_currency`/`comp_period`).
-5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title)` catches the same role via different URLs.
+5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title) + normalize(location)` catches the same role via different URLs, while the same role listed separately per location is treated as distinct. Location is free text, so a repost with a reworded location can slip through as a duplicate note — deliberately: a duplicate note costs seconds of triage, a falsely-deduped posting is an application never made.
 6. **Location** (Python) — apply remote/geo rules to the extracted location.
 7. **Salary** (Python) — compare extracted comp (normalized to annual) against the floor; handle "not listed" per profile.
 8. **Skill-gap** (agent, Sonnet) — compare résumé/skills to requirements.
@@ -70,6 +70,7 @@ job-pipeline run                      # full run from configured sources + inbox
 job-pipeline run --url https://...    # process ONLY this URL (repeatable); sources/inbox skipped
 job-pipeline run --mock               # dry run using MockRunner — no tokens spent
 job-pipeline run --url https://... --mock   # test a specific URL without spending tokens
+job-pipeline run --url https://... --reprocess   # re-run a previously processed URL (clears its seen entry; add --force to also overwrite an edited note)
 ```
 
 Any URL passed via `--url` is processed this run only (not written to the inbox file). The
@@ -91,6 +92,12 @@ models: {extract: haiku, skill_gap: sonnet, score: opus}
 ```
 
 Add, remove, or reorder stages with a config edit.
+
+One optional stage ships disabled: add `score_floor` between `score` and `publish`
+(with `score_floor: 60` in `profile.md`) to keep below-floor jobs out of your vault.
+A score-floor rejection is terminal — the URL is marked seen and won't be re-scored,
+and raising the floor later doesn't resurrect past rejects (re-run one deliberately
+with `--reprocess`).
 
 ### 2. Pluggable sources, stages, and seeders via the registry
 
