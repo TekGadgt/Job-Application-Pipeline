@@ -55,3 +55,40 @@ def test_url_flag_skips_configured_sources(monkeypatch, tmp_path):
 def test_no_url_flag_uses_configured_sources(monkeypatch, tmp_path):
     captured = _run(monkeypatch, tmp_path, [])
     assert captured["kwargs"]["sources"] is None   # run_pipeline builds from config
+
+
+def test_reprocess_requires_url(tmp_path):
+    import pytest
+    cfg, prof = _write_configs(tmp_path)
+    with pytest.raises(SystemExit):
+        cli.main(["run", "--config", str(cfg), "--profile", str(prof),
+                  "--mock", "--reprocess"])
+
+
+def test_reprocess_clears_seen_row_before_run(monkeypatch, tmp_path):
+    import hashlib
+    from job_pipeline.store.seen_index import SeenIndex
+    vault = tmp_path / "vault"
+    cfg = tmp_path / "pipeline.yaml"
+    cfg.write_text(
+        "stages: [dedup]\n"
+        f"output: {{vault: {vault}}}\n"
+        "models: {extract: haiku, skill_gap: sonnet, score: opus}\n"
+    )
+    prof = tmp_path / "profile.md"
+    prof.write_text(PROFILE)
+    url = "https://example.com/job/1"
+    h = hashlib.sha256(url.encode()).hexdigest()[:16]
+    idx = SeenIndex(vault / ".job_pipeline.seen.sqlite")
+    idx.mark(h)
+    idx.close()
+
+    def fake_run_pipeline(*args, **kwargs):
+        from job_pipeline.core.pipeline import RunSummary
+        return RunSummary()
+
+    monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
+    rc = cli.main(["run", "--config", str(cfg), "--profile", str(prof),
+                   "--mock", "--url", url, "--reprocess"])
+    assert rc == 0
+    assert not SeenIndex(vault / ".job_pipeline.seen.sqlite").has_url(h)

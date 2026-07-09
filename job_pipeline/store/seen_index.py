@@ -53,5 +53,15 @@ class SeenIndex:
         )
         self._conn().commit()
 
+    def unmark(self, url_hash: str) -> bool:
+        """Delete the row for url_hash; returns whether a row existed.
+
+        Deliberate escape hatch (--reprocess): removing the row also clears
+        its fuzzy_key, so the re-run redoes URL AND fuzzy dedup for this entry.
+        """
+        cur = self._conn().execute("DELETE FROM seen WHERE url_hash = ?", (url_hash,))
+        self._conn().commit()
+        return cur.rowcount > 0
+
     def count(self) -> int:
         return self._conn().execute("SELECT COUNT(*) FROM seen").fetchone()[0]

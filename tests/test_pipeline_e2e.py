@@ -122,3 +122,28 @@ def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):
     assert summary.notes == []
     from job_pipeline.store.seen_index import SeenIndex
     assert SeenIndex(db).count() == 1        # terminal: marked seen
+
+
+def test_unmark_lets_a_seen_url_republish(tmp_path):
+    cfg, prof = make_cfg(tmp_path), make_profile()
+    db = tmp_path / "seen.sqlite"
+    replies = [
+        {"title": "T", "company": "C", "location": "Remote", "comp_text": "$150k",
+         "comp_min": 150000, "comp_max": 150000, "comp_currency": "USD",
+         "comp_period": "annual", "requirements": [], "description": "d"},
+        {"have": [], "missing": [], "partial": []},
+        {"score": 90.0, "rationale": "ok"},
+    ]
+    url = "https://x.com/1"
+    s1 = run_pipeline(cfg, prof, MockRunner(list(replies)),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s1.published == 1
+    s2 = run_pipeline(cfg, prof, MockRunner([]),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s2.rejected == 1                      # dedup: seen
+    from job_pipeline.store.seen_index import SeenIndex
+    import hashlib
+    SeenIndex(db).unmark(hashlib.sha256(url.encode()).hexdigest()[:16])
+    s3 = run_pipeline(cfg, prof, MockRunner(list(replies)),
+                      sources=[FakeSource([job(url, "listing")])], db_path=db)
+    assert s3.published == 1                     # reprocessed successfully

@@ -41,3 +41,18 @@ def test_close_and_reopen(tmp_path):
     idx.mark("abc")
     idx.close()
     assert idx.has_url("abc")   # lazily reconnects
+
+
+def test_unmark_removes_url_and_its_fuzzy_key(tmp_path):
+    idx = SeenIndex(tmp_path / "seen.sqlite")
+    idx.mark("abc", "acme|engineer|remote")
+    idx.mark("other", "beta|dev|nyc")
+    assert idx.unmark("abc") is True
+    assert not idx.has_url("abc")
+    assert not idx.has_fuzzy("acme|engineer|remote")   # same row, one delete
+    assert idx.has_url("other")                        # untouched
+
+
+def test_unmark_unknown_hash_returns_false(tmp_path):
+    idx = SeenIndex(tmp_path / "seen.sqlite")
+    assert idx.unmark("nope") is False

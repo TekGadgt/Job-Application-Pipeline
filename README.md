@@ -70,6 +70,7 @@ job-pipeline run                      # full run from configured sources + inbox
 job-pipeline run --url https://...    # process ONLY this URL (repeatable); sources/inbox skipped
 job-pipeline run --mock               # dry run using MockRunner — no tokens spent
 job-pipeline run --url https://... --mock   # test a specific URL without spending tokens
+job-pipeline run --url https://... --reprocess   # re-run a previously processed URL (clears its seen entry; add --force to also overwrite an edited note)
 ```
 
 Any URL passed via `--url` is processed this run only (not written to the inbox file). The
