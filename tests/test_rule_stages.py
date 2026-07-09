@@ -83,6 +83,8 @@ def test_fuzzy_dedup_legacy_row_blocks_all_locations(tmp_path):
     out = FuzzyDedupStage(idx).run(
         make_job(company="Acme", title="Engineer", location="Berlin"))
     assert out.rejected and out.reject_stage == "dedup_fuzzy"
+    # the reason names the key that actually matched, not the 3-part probe
+    assert "acme|engineer (legacy pre-location match)" in out.reject_reason
 
 
 def test_fuzzy_dedup_no_key_when_company_and_title_empty(tmp_path):

@@ -25,8 +25,11 @@ class FuzzyDedupStage:
             job.add_trace("dedup_fuzzy", "no key (empty company+title)")
             return job
         job.fuzzy_key = make_fuzzy_key(job.company, job.title, job.location)
-        if self.seen.has_fuzzy(job.fuzzy_key) or self.seen.has_fuzzy(legacy):
+        if self.seen.has_fuzzy(job.fuzzy_key):
             job.mark_rejected("dedup_fuzzy", f"duplicate role: {job.fuzzy_key}")
+        elif self.seen.has_fuzzy(legacy):
+            # report the key that actually matched — a legacy row blocks all locations
+            job.mark_rejected("dedup_fuzzy", f"duplicate role: {legacy} (legacy pre-location match)")
         else:
             job.add_trace("dedup_fuzzy", "passed")
         return job
