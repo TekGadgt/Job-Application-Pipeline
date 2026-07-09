@@ -1,0 +1,47 @@
+# Roadmap — Spec Batches
+
+All 15 open specs (in `docs/superpowers/specs/`) bundled into 8 implementation batches.
+Each batch = one branch → one plan (`docs/superpowers/plans/`) → subagent-driven build → one PR.
+Ordering rule: a batch starts only when the batches it's **blocked by** have merged.
+
+Execution order: **A → B → C → D → E → F → G → H** (value-first, then structure, then the fan-out).
+
+## Batch A — Run hygiene *(unblocked)*
+Fixes the things biting daily runs.
+- `2026-07-09-location-aware-fuzzy-dedup` — `company|title|location` keys; legacy 2-part rows keep blocking all locations
+- `2026-07-09-score-floor` — rule stage between `score` and `publish`; `score_floor` in profile
+- `2026-07-03-reprocess-flag` — `run --url <u> --reprocess`; `SeenIndex.unmark`
+
+## Batch B — Vault output *(unblocked)*
+Everything that lands in notes; one golden-test rebase for all three.
+- `2026-07-03-comp-in-notes` — comp frontmatter keys + `## Compensation` section
+- `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
+- `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
+
+## Batch C — Modularity structure *(unblocked; gates D/E/F)*
+All house conventions land together. Biggest batch (~8 tasks), mostly mechanical; split at the store-backends boundary if unwieldy.
+- `2026-07-03-source-module-split` — `feeds.py` → `rss/greenhouse/lever.py` + RSS hardening + seeders `__init__` aggregator
+- `2026-07-03-stage-context` — `StageContext.from_context`; deletes the `build_stages` deps dict
+- `2026-07-03-store-backends` — `StateStore`/`Publisher` protocols + registries; `sqlite`/`obsidian` backends
+
+## Batch D — Multi-provider runners *(blocked by C)*
+- `2026-07-02-multi-provider-runners` — `models: {stage: [provider:model, …]}` chains, `ModelChain`, runner registry, `runners/` package
+
+## Batch E — Intake expansion *(blocked by C)*
+Built together: scrape's detail fetches use the fetcher seam.
+- `2026-07-02-scrape-source` — `type: scrape` careers pages (robots.txt, seen-skip, bs4)
+- `2026-07-03-js-fallback-fetcher` — `looks_js_shell` + Playwright `[browser]` extra
+
+## Batch F — Observability *(blocked by C; gates H)*
+- `2026-07-03-observability-run-history` — errored guard, terminal-outcome logging, `runs`/`run_jobs` tables, `log`/`why` commands, retires `keep_rejects`
+
+## Batch G — Resume match *(blocked by D)*
+- `2026-07-03-resume-match` (rev 2026-07-09) — labeled resumes + master inventory, publish-gated stage, wikilinked recommendation
+
+## Batch H — Local server & web UI *(blocked by F; last)*
+- `2026-07-03-local-server-ui` — flock run lock, FastAPI `[server]` extra, scheduler, vanilla-JS dashboard
+
+## Done
+- `2026-07-02-job-application-pipeline-design` — core pipeline (merged)
+- `2026-07-02-stage-package-refactor` — PR #1 (merged)
+- `2026-07-02-extract-hints` — PR #2 (merged)
