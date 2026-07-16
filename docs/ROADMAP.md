@@ -1,6 +1,6 @@
 # Roadmap — Spec Batches
 
-All 15 open specs (in `docs/superpowers/specs/`) bundled into 8 implementation batches.
+All 16 open specs (in `docs/superpowers/specs/`) bundled into 8 implementation batches.
 Each batch = one branch → one plan (`docs/superpowers/plans/`) → subagent-driven build → one PR.
 Ordering rule: a batch starts only when the batches it's **blocked by** have merged.
 
@@ -25,6 +25,7 @@ All house conventions land together. Biggest batch (~8 tasks), mostly mechanical
 Built together: scrape's detail fetches use the fetcher seam.
 - `2026-07-02-scrape-source` — `type: scrape` careers pages (robots.txt, seen-skip, bs4)
 - `2026-07-03-js-fallback-fetcher` — `looks_js_shell` + Playwright `[browser]` extra
+- `2026-07-16-ashby-source` — `type: ashby` posting-API source (UltiPro deferred to scrape)
 
 ## Batch F — Observability *(blocked by C; gates H)*
 - `2026-07-03-observability-run-history` — errored guard, terminal-outcome logging, `runs`/`run_jobs` tables, `log`/`why` commands, retires `keep_rejects`
