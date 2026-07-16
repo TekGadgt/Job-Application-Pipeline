@@ -1,16 +1,20 @@
 # Roadmap — Spec Batches
 
-All 16 open specs (in `docs/superpowers/specs/`) bundled into 8 implementation batches.
+All open specs (in `docs/superpowers/specs/`) bundled into implementation batches.
 Each batch = one branch → one plan (`docs/superpowers/plans/`) → subagent-driven build → one PR.
 Ordering rule: a batch starts only when the batches it's **blocked by** have merged.
 
-Execution order: **B → C → D → E → F → G → H** (value-first, then structure, then the fan-out).
+Execution order: **B → B2 → C → D → E → F → G → H** (value-first, then structure, then the fan-out).
 
 ## Batch B — Vault output *(unblocked — next up)*
 Everything that lands in notes; one golden-test rebase for all three.
 - `2026-07-03-comp-in-notes` — comp frontmatter keys + `## Compensation` section
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
 - `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
+
+## Batch B2 — Location normalization *(unblocked; small)*
+Deterministic-only, no batch dependencies; first of the modular pre-gate normalizer stages.
+- `2026-07-16-location-normalization` — `normalize_location` stage before `dedup_fuzzy`/`location`, shared canonicalizer normalizes profile metros at load, metro list collapsed. (Motivated by the Colonial Williamsburg `Virginia`-vs-`VA` reject.)
 
 ## Batch C — Modularity structure *(unblocked; gates D/E/F)*
 All house conventions land together. Biggest batch (~8 tasks), mostly mechanical; split at the store-backends boundary if unwieldy.
