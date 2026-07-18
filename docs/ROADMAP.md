@@ -12,9 +12,10 @@ Everything that lands in notes; one golden-test rebase for all three.
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
 - `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
 
-## Batch B2 — Location normalization *(unblocked; small)*
-Deterministic-only, no batch dependencies; first of the modular pre-gate normalizer stages.
-- `2026-07-16-location-normalization` — `normalize_location` stage before `dedup_fuzzy`/`location`, shared canonicalizer normalizes profile metros at load, metro list collapsed. (Motivated by the Colonial Williamsburg `Virginia`-vs-`VA` reject.)
+## Batch B2 — Normalization gates *(unblocked; small)*
+Deterministic-only, no batch dependencies; the modular pre-gate normalizer family (each normalizer sits immediately before the filter it feeds).
+- `2026-07-16-location-normalization` — `normalize_location` stage before `dedup_fuzzy`/`location`, shared canonicalizer normalizes profile metros at load, metro list collapsed; `locations.relocation` flag accepts all locations. (Motivated by the Colonial Williamsburg `Virginia`-vs-`VA` reject.)
+- `2026-07-18-comp-normalization` — `normalize_comp` stage before `salary`: annualize + convert `comp_max` to the floor currency (`salary_currency`, `fx_rates` override, static built-in table); salary stage becomes a pure compare. (Fixes live bug: `comp_currency` is ignored, so a £90k listing rejects against a $100k floor.)
 
 ## Batch C — Modularity structure *(unblocked; gates D/E/F)*
 All house conventions land together. Biggest batch (~8 tasks), mostly mechanical; split at the store-backends boundary if unwieldy.

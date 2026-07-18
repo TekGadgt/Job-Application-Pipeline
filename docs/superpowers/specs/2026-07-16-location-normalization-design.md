@@ -56,7 +56,11 @@ Default stage list becomes:
 
 `Profile` load passes each `allowed_metros` entry through the same `normalize_location`. An entry that fails to parse (the detectable case is an unknown state name; city-name typos are inherently undetectable without a gazetteer) logs a load-time warning naming the entry, instead of silently never matching. The profile's duplicated metro list is collapsed back to single canonical entries as part of this spec.
 
-### 5. Fuzzy-key drift (accepted, documented)
+### 5. `relocation` flag (`config.py`, `stages/rules/location.py`, example profile)
+
+*Added 2026-07-18.* `LocationRules` gains `relocation: bool = False`. When true, the location gate passes every job — overriding both `allowed_metros` and the remote check — with trace `passed (relocation: all locations accepted)`. `normalize_location` still runs regardless: canonical locations still feed fuzzy dedup and notes. `profile.example.md` gets a commented-out `# relocation: true` line under `locations:`.
+
+### 6. Fuzzy-key drift (accepted, documented)
 
 Canonical locations change future fuzzy keys, so existing seen-index rows keyed on raw locations won't match their canonical successors — a cross-source duplicate of an already-seen role could slip through once. With ~17 rows in the index, this one-time drift is accepted; no migration. (URL-level dedup is unaffected.)
 
@@ -65,6 +69,7 @@ Canonical locations change future fuzzy keys, so existing seen-index rows keyed 
 - Table-driven unit tests for `normalize_location`: `Williamsburg, Virginia → Williamsburg, VA`; `Richmond, VA` idempotent; `New York, New York → New York, NY`; trailing `, United States` stripped; `Hybrid - Williamsburg, VA → Williamsburg, VA`; `Remote` / `Fully Remote (US) → Remote`; `Remote — Richmond, VA` remote+city form; `Richmond, VA / Seattle, WA` multi-location; `Greater Richmond Area` fail-open passthrough; empty string passthrough.
 - Stage test: `job.location` replaced, trace records old → new; empty location untouched.
 - Profile test: metros normalized at load; unknown-state entry produces a warning.
+- Relocation test: `relocation: true` passes a job whose location matches no metro and isn't remote; `relocation: false` (default) preserves current behavior.
 - Integration (stage list with MockRunner): a job extracting `"Williamsburg, Virginia"` against a profile listing `"Williamsburg, VA"` passes the location gate; its fuzzy key is built from the canonical form.
 
 ## Non-Goals / Future Work
