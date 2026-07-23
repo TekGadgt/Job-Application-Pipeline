@@ -19,7 +19,7 @@ class FakeSource:
 def make_cfg(tmp_path):
     return PipelineConfig(
         stages=["dedup", "hard_filter", "extract", "dedup_fuzzy",
-                "location", "salary", "skill_gap", "score", "publish"],
+                "skill_gap", "score", "publish"],
         models={"extract": "haiku", "skill_gap": "sonnet", "score": "opus"},
         output=OutputConfig(vault=tmp_path / "vault"),
         limits=Limits(max_agent_jobs_per_run=10),
@@ -107,7 +107,7 @@ def test_same_role_repost_publishes_flagged_not_rejected(tmp_path):
 def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):
     cfg = make_cfg(tmp_path)
     cfg.stages = ["dedup", "hard_filter", "extract", "dedup_fuzzy",
-                  "location", "salary", "skill_gap", "score", "score_floor", "publish"]
+                  "skill_gap", "score", "score_floor", "publish"]
     prof = make_profile()
     prof.score_floor = 60
     db = tmp_path / "seen.sqlite"

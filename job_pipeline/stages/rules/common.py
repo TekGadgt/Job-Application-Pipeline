@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import re
 
-HOURS_PER_YEAR = 2080
-
 
 def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())

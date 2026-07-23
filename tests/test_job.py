@@ -28,5 +28,5 @@ def test_mark_errored_is_distinct_from_rejected():
 
 def test_defaults():
     j = make_job()
-    assert j.comp_min is None and j.salary_ok is None
+    assert j.comp_min is None and j.score is None
     assert j.requirements == [] and j.skill_gap == {} and j.trace == []

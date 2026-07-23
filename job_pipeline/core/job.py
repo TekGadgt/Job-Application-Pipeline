@@ -30,9 +30,6 @@ class Job:
     employer_address: str = ""         # VEC, if present in listing
     employer_phone: str = ""
     employer_email: str = ""
-    # after rule stages
-    location_ok: bool | None = None
-    salary_ok: bool | None = None
     # after agent stages
     skill_gap: dict = field(default_factory=dict)   # {have, missing, partial}
     score: float | None = None
