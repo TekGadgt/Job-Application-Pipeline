@@ -74,7 +74,7 @@ def test_second_run_dedups_everything(tmp_path):
     assert summary.rejected == 1 and summary.published == 0   # dedup, zero agent calls
 
 
-def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
+def test_same_role_repost_publishes_flagged_not_rejected(tmp_path):
     cfg = make_cfg(tmp_path)
     prof = Profile(salary_floor=100000, blocklist=["web3"], body="Python dev",
                    locations=LocationRules(remote=True, allowed_metros=["New York"]))
@@ -96,11 +96,12 @@ def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
         sources=[run1], db_path=db)
     assert s1.published == 2 and s1.rejected == 0
 
-    # Run 2: repost of the Remote role under a third URL -> fuzzy dedup rejects
+    # Run 2: repost of the Remote role under a third URL -> publishes anyway,
+    # fuzzy dedup only records the possible-duplicate signal (URL is the only hard dedup)
     run2 = FakeSource([job("https://x.com/c", "listing c")])
-    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote")]),
+    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote"), gap, score]),
                       sources=[run2], db_path=db)
-    assert s2.published == 0 and s2.rejected == 1
+    assert s2.published == 1 and s2.rejected == 0
 
 
 def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):

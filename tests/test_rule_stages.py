@@ -57,13 +57,15 @@ def test_legacy_fuzzy_key_is_two_part():
     assert legacy_fuzzy_key("Acme, Inc.", "Sr. Engineer") == "acmeinc|srengineer"
 
 
-def test_fuzzy_dedup_rejects_cross_source_duplicate(tmp_path):
+def test_fuzzy_dedup_flags_cross_source_duplicate_but_passes(tmp_path):
     idx = SeenIndex(tmp_path / "s.sqlite")
     idx.mark("otherhash", "acme|engineer|remote")
     j = make_job(company="Acme", title="Engineer", location="Remote")
     out = FuzzyDedupStage(idx).run(j)
-    assert out.rejected and out.reject_stage == "dedup_fuzzy"
-    assert j.fuzzy_key == "acme|engineer|remote"
+    assert not out.rejected
+    assert out.fuzzy_key == "acme|engineer|remote"
+    assert any("possible duplicate: acme|engineer|remote" in verdict
+               for _, verdict, _ in out.trace)
 
 
 def test_fuzzy_dedup_passes_same_role_different_location(tmp_path):
@@ -75,16 +77,17 @@ def test_fuzzy_dedup_passes_same_role_different_location(tmp_path):
     assert out.fuzzy_key == "acme|engineer|newyorkny"
 
 
-def test_fuzzy_dedup_legacy_row_blocks_all_locations(tmp_path):
+def test_fuzzy_dedup_legacy_row_flags_all_locations(tmp_path):
     # Rows written before location-aware keys hold the 2-part form and
-    # keep blocking the role everywhere.
+    # still flag the role everywhere — but no longer reject it.
     idx = SeenIndex(tmp_path / "s.sqlite")
     idx.mark("oldhash", "acme|engineer")
     out = FuzzyDedupStage(idx).run(
         make_job(company="Acme", title="Engineer", location="Berlin"))
-    assert out.rejected and out.reject_stage == "dedup_fuzzy"
-    # the reason names the key that actually matched, not the 3-part probe
-    assert "acme|engineer (legacy pre-location match)" in out.reject_reason
+    assert not out.rejected
+    # the trace names the key that actually matched, not the 3-part probe
+    assert any("possible duplicate: acme|engineer (legacy pre-location match)" in verdict
+               for _, verdict, _ in out.trace)
 
 
 def test_fuzzy_dedup_no_key_when_company_and_title_empty(tmp_path):
