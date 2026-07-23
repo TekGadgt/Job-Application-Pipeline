@@ -1,7 +1,7 @@
 # Location Normalization — Design Spec
 
 **Date:** 2026-07-16
-**Status:** Approved for planning
+**Status:** Shelved (2026-07-23 lean re-cut — location gate removed; see 2026-07-23-lean-core-design.md)
 **Motivation:** Real incident: the Colonial Williamsburg "Software Engineer II or III" posting extracted `location: "Williamsburg, Virginia"` and was rejected by the location stage even after the user added `"Williamsburg, VA"` to `allowed_metros` — the substring match compares literal strings, so `va` never matches `virginia`. The same abbreviation-vs-full-name mismatch is latent for every metro in the profile; any board that spells out the state name slips past. The stopgap (hand-duplicating every metro in both spellings) doesn't scale and invites typos.
 
 ## Goal

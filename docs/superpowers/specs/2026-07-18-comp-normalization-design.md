@@ -1,7 +1,7 @@
 # Compensation Normalization — Design Spec
 
 **Date:** 2026-07-18
-**Status:** Approved for planning
+**Status:** Shelved (2026-07-23 lean re-cut — salary gate removed; see 2026-07-23-lean-core-design.md)
 **Motivation:** The salary stage ignores `comp_currency` entirely: a £90,000 listing compares `90000 < 100000` against a USD floor and is rejected, even though it's ~$120k. This is a live correctness bug, not just a gap — extract already emits `comp_currency`, and nothing reads it. Second of the modular pre-gate normalizer family established by `2026-07-16-location-normalization-design.md`: each normalizer sits immediately before the filter gate it feeds.
 
 ## Goal
