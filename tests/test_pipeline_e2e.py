@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
 from pathlib import Path
-from job_pipeline.config import Profile, PipelineConfig, OutputConfig, Limits, LocationRules
+from job_pipeline.config import Profile, PipelineConfig, OutputConfig, Limits
 from job_pipeline.core.job import Job
 from job_pipeline.core.runner import MockRunner
 from job_pipeline.core.pipeline import run_pipeline
@@ -27,8 +27,7 @@ def make_cfg(tmp_path):
 
 
 def make_profile():
-    return Profile(salary_floor=100000, blocklist=["web3"],
-                   locations=LocationRules(remote=True), body="Python dev")
+    return Profile(blocklist=["web3"], body="Python dev")
 
 
 def job(url, text):
@@ -76,8 +75,7 @@ def test_second_run_dedups_everything(tmp_path):
 
 def test_same_role_repost_publishes_flagged_not_rejected(tmp_path):
     cfg = make_cfg(tmp_path)
-    prof = Profile(salary_floor=100000, blocklist=["web3"], body="Python dev",
-                   locations=LocationRules(remote=True, allowed_metros=["New York"]))
+    prof = Profile(blocklist=["web3"], body="Python dev")
     db = tmp_path / "seen.sqlite"
 
     def extract(loc):

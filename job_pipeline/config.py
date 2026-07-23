@@ -3,31 +3,19 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
 
-class LocationRules(BaseModel):
-    remote: bool = False
-    allowed_metros: list[str] = []
-
-
 class Profile(BaseModel):
-    salary_floor: int | None = None
     score_floor: int | None = None
-    locations: LocationRules = LocationRules()
     blocklist: list[str] = []
-    must_have_skills: list[str] = []
-    nice_to_have: list[str] = []
-    salary_not_listed: Literal["keep", "reject"] = "keep"
     body: str = ""                      # prose: resume + fuzzy preferences
 
 
 class OutputConfig(BaseModel):
     vault: Path
-    keep_rejects: bool = True
 
 
 class Limits(BaseModel):

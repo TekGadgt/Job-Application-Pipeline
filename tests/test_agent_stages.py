@@ -31,7 +31,7 @@ def test_extract_maps_reply_onto_job():
 
 
 def test_skill_gap_stores_dict_and_reads_profile():
-    p = Profile(must_have_skills=["python"], body="## Resume\nPython dev")
+    p = Profile(body="## Resume\nPython dev")
     r = MockRunner([{"have": ["python"], "missing": ["rust"], "partial": []}])
     j = SkillGapStage(r, "sonnet", p).run(make_job(requirements=["python", "rust"]))
     assert j.skill_gap == {"have": ["python"], "missing": ["rust"], "partial": []}
