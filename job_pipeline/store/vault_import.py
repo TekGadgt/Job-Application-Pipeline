@@ -74,6 +74,9 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
         except (ValueError, yaml.YAMLError):
             summary.skipped_unparseable += 1
             continue
+        if not isinstance(old, dict):
+            summary.skipped_unparseable += 1
+            continue
         mapped = {canon: old[key] for canon, key in imp.fields.items() if key in old}
         url = str(mapped.get("source_url") or "")
         if url:

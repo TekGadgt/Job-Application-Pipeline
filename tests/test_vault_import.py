@@ -106,6 +106,13 @@ def test_import_skips_unparseable(tmp_path):
     assert s.imported == 0 and s.skipped_unparseable == 1
 
 
+def test_import_skips_non_dict_frontmatter(tmp_path):
+    cfg, old = make_cfg(tmp_path)
+    (old / "weird.md").write_text("---\n- a\n- b\n---\nbody\n")
+    s = run_import(cfg)
+    assert s.imported == 0 and s.skipped_unparseable == 1
+
+
 def test_dry_run_writes_nothing(tmp_path):
     cfg, old = make_cfg(tmp_path)
     (old / "oldco.md").write_text(OLD_NOTE)
