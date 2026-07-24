@@ -9,21 +9,19 @@ as Virginia Employment Commission (VEC) work-search records. **No automated appl
 Cheap deterministic filters run first, dropping jobs before any agent tokens are spent.
 
 ```
-INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-FUZZY ──▶ LOCATION ──▶ SALARY ──▶ SKILL-GAP ──▶ SCORE ──▶ PUBLISH
- (feeds +   (Python,  (Python,        (AGENT,     (Python,        (Python)     (Python)   (AGENT,       (AGENT,   (Python →
-  manual)    URL key)  keyword scan)   Haiku)      company+title)                          Sonnet)       Opus)     Obsidian)
+INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-FUZZY ──▶ SKILL-GAP ──▶ SCORE ──▶ PUBLISH
+ (feeds +   (Python,  (Python,        (AGENT,     (Python,        (AGENT,       (AGENT,   (Python →
+  manual)    URL key)  keyword scan)   Haiku)      company+title)  Sonnet)       Opus)     Obsidian)
 ```
 
 1. **Intake** — feeds (Greenhouse/Lever/RSS) + manual URLs (`--url` flag and/or an inbox file) → raw listings.
 2. **Dedup** (Python) — drop anything in the seen-index (keyed by URL hash).
 3. **Hard-filter** (Python) — scan raw text for the blocklist before any agent spend.
 4. **Extract** (agent, Haiku) — normalize survivors → structured fields including numeric comp (`comp_min`/`comp_max`/`comp_currency`/`comp_period`).
-5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title) + normalize(location)` catches the same role via different URLs, while the same role listed separately per location is treated as distinct. Location is free text, so a repost with a reworded location can slip through as a duplicate note — deliberately: a duplicate note costs seconds of triage, a falsely-deduped posting is an application never made.
-6. **Location** (Python) — apply remote/geo rules to the extracted location.
-7. **Salary** (Python) — compare extracted comp (normalized to annual) against the floor; handle "not listed" per profile.
-8. **Skill-gap** (agent, Sonnet) — compare résumé/skills to requirements.
-9. **Score** (agent, Opus) — final fit judgment + rationale on the smallest surviving set.
-10. **Publish** (Python) — write Obsidian note (score, gap, VEC fields).
+5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title) + normalize(location)` records the same role seen via different URLs. Record-only since the 2026-07-23 lean re-cut: a hit traces `possible duplicate` and the job continues — a duplicate note costs seconds of triage, a falsely-deduped posting is an application never made.
+6. **Skill-gap** (agent, Sonnet) — compare résumé/skills to requirements.
+7. **Score** (agent, Opus) — final fit judgment + rationale on the smallest surviving set.
+8. **Publish** (Python) — write Obsidian note (score, gap, VEC fields).
 
 Every stage implements one interface, `run(job) -> job`. Rejected jobs short-circuit but are logged so you can see *why* and tune your profile.
 
@@ -45,7 +43,7 @@ Copy the example configs and fill them in:
 ```bash
 cp config/profile.example.md config/profile.md
 cp config/pipeline.example.yaml config/pipeline.yaml
-$EDITOR config/profile.md       # paste your résumé, set salary_floor, blocklist, etc.
+$EDITOR config/profile.md       # paste your résumé, set blocklist, etc.
 $EDITOR config/pipeline.yaml    # set your vault path, sources, inbox file
 ```
 
@@ -87,7 +85,7 @@ The pipeline has three seams designed to let you extend without touching core co
 `pipeline.yaml` lists stages by name, in order, with a model tier per agent stage:
 
 ```yaml
-stages: [dedup, hard_filter, extract, dedup_fuzzy, location, salary, skill_gap, score, publish]
+stages: [dedup, hard_filter, extract, dedup_fuzzy, skill_gap, score, publish]
 models: {extract: haiku, skill_gap: sonnet, score: opus}
 ```
 
@@ -112,7 +110,7 @@ Register a new adapter by name; core code is unchanged.
 Each stage lives in its own module — deterministic filters under
 `job_pipeline/stages/rules/`, agent stages under `job_pipeline/stages/agents/`.
 To write your own, copy the closest existing one as a template
-(`job_pipeline/stages/rules/location.py` for a filter,
+(`job_pipeline/stages/rules/score_floor.py` for a filter,
 `job_pipeline/stages/agents/skill_gap.py` for an agent stage), register it with
 `@register_stage("your_name")`, and add the name to `stages:` in
 `config/pipeline.yaml`.

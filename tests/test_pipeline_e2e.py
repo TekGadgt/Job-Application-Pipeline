@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
 from pathlib import Path
-from job_pipeline.config import Profile, PipelineConfig, OutputConfig, Limits, LocationRules
+from job_pipeline.config import Profile, PipelineConfig, OutputConfig, Limits
 from job_pipeline.core.job import Job
 from job_pipeline.core.runner import MockRunner
 from job_pipeline.core.pipeline import run_pipeline
@@ -19,7 +19,7 @@ class FakeSource:
 def make_cfg(tmp_path):
     return PipelineConfig(
         stages=["dedup", "hard_filter", "extract", "dedup_fuzzy",
-                "location", "salary", "skill_gap", "score", "publish"],
+                "skill_gap", "score", "publish"],
         models={"extract": "haiku", "skill_gap": "sonnet", "score": "opus"},
         output=OutputConfig(vault=tmp_path / "vault"),
         limits=Limits(max_agent_jobs_per_run=10),
@@ -27,8 +27,7 @@ def make_cfg(tmp_path):
 
 
 def make_profile():
-    return Profile(salary_floor=100000, blocklist=["web3"],
-                   locations=LocationRules(remote=True), body="Python dev")
+    return Profile(blocklist=["web3"], body="Python dev")
 
 
 def job(url, text):
@@ -74,10 +73,9 @@ def test_second_run_dedups_everything(tmp_path):
     assert summary.rejected == 1 and summary.published == 0   # dedup, zero agent calls
 
 
-def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
+def test_same_role_repost_publishes_flagged_not_rejected(tmp_path):
     cfg = make_cfg(tmp_path)
-    prof = Profile(salary_floor=100000, blocklist=["web3"], body="Python dev",
-                   locations=LocationRules(remote=True, allowed_metros=["New York"]))
+    prof = Profile(blocklist=["web3"], body="Python dev")
     db = tmp_path / "seen.sqlite"
 
     def extract(loc):
@@ -96,17 +94,18 @@ def test_same_role_different_location_publishes_then_repost_rejects(tmp_path):
         sources=[run1], db_path=db)
     assert s1.published == 2 and s1.rejected == 0
 
-    # Run 2: repost of the Remote role under a third URL -> fuzzy dedup rejects
+    # Run 2: repost of the Remote role under a third URL -> publishes anyway,
+    # fuzzy dedup only records the possible-duplicate signal (URL is the only hard dedup)
     run2 = FakeSource([job("https://x.com/c", "listing c")])
-    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote")]),
+    s2 = run_pipeline(cfg, prof, MockRunner([extract("Remote"), gap, score]),
                       sources=[run2], db_path=db)
-    assert s2.published == 0 and s2.rejected == 1
+    assert s2.published == 1 and s2.rejected == 0
 
 
 def test_score_floor_rejects_low_scoring_job_terminally(tmp_path):
     cfg = make_cfg(tmp_path)
     cfg.stages = ["dedup", "hard_filter", "extract", "dedup_fuzzy",
-                  "location", "salary", "skill_gap", "score", "score_floor", "publish"]
+                  "skill_gap", "score", "score_floor", "publish"]
     prof = make_profile()
     prof.score_floor = 60
     db = tmp_path / "seen.sqlite"

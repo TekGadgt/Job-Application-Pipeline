@@ -29,17 +29,12 @@ def test_load_profile_parses_frontmatter_and_body(tmp_path):
     p = tmp_path / "profile.md"
     p.write_text(PROFILE)
     prof = load_profile(p)
-    assert prof.salary_floor == 140000
-    assert prof.locations.remote is True
     assert "web3" in prof.blocklist
     assert "I write Python." in prof.body
-
-
-def test_profile_rejects_bad_salary_not_listed(tmp_path):
-    p = tmp_path / "profile.md"
-    p.write_text(PROFILE.replace("salary_not_listed: keep", "salary_not_listed: maybe"))
-    with pytest.raises(ValidationError):
-        load_profile(p)
+    # keys removed in the 2026-07-23 lean re-cut load inert, not as errors
+    for dead in ("salary_floor", "locations", "must_have_skills",
+                 "nice_to_have", "salary_not_listed"):
+        assert not hasattr(prof, dead)
 
 
 def test_profile_requires_frontmatter(tmp_path):
@@ -56,6 +51,7 @@ def test_load_pipeline_config(tmp_path):
     assert cfg.stages == ["dedup", "hard_filter"]
     assert cfg.models["score"] == "opus"
     assert cfg.limits.max_agent_jobs_per_run == 40
+    assert not hasattr(cfg.output, "keep_rejects")   # retired dead config
 
 
 def test_pipeline_config_rejects_negative_cap(tmp_path):

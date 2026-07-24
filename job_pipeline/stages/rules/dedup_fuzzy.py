@@ -1,4 +1,8 @@
-"""Drop cross-source duplicates by normalized company+title+location."""
+"""Record cross-source duplicate signal by normalized company+title+location.
+
+Record-only since the 2026-07-23 lean re-cut: URL dedup is the only hard
+dedup; a fuzzy hit traces `possible duplicate` and the job continues.
+"""
 from __future__ import annotations
 
 from job_pipeline.core.job import Job
@@ -10,9 +14,9 @@ from job_pipeline.store.seen_index import SeenIndex
 
 @register_stage("dedup_fuzzy")
 class FuzzyDedupStage:
-    spec = StageSpec("dedup_fuzzy", "drop cross-source duplicates by company+title+location",
+    spec = StageSpec("dedup_fuzzy", "record company+title+location key; flag possible duplicates",
                      requires=["company", "title", "location"],
-                     produces=["fuzzy_key", "rejected"],
+                     produces=["fuzzy_key"],
                      kind="deterministic", cost_tier="free")
 
     def __init__(self, seen_index: SeenIndex) -> None:
@@ -26,10 +30,10 @@ class FuzzyDedupStage:
             return job
         job.fuzzy_key = make_fuzzy_key(job.company, job.title, job.location)
         if self.seen.has_fuzzy(job.fuzzy_key):
-            job.mark_rejected("dedup_fuzzy", f"duplicate role: {job.fuzzy_key}")
+            job.add_trace("dedup_fuzzy", f"possible duplicate: {job.fuzzy_key}")
         elif self.seen.has_fuzzy(legacy):
-            # report the key that actually matched — a legacy row blocks all locations
-            job.mark_rejected("dedup_fuzzy", f"duplicate role: {legacy} (legacy pre-location match)")
+            # name the key that actually matched — legacy rows flag all locations
+            job.add_trace("dedup_fuzzy", f"possible duplicate: {legacy} (legacy pre-location match)")
         else:
             job.add_trace("dedup_fuzzy", "passed")
         return job
