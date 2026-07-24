@@ -13,8 +13,14 @@ Everything that lands in notes; one golden-test rebase for all three, plus the n
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
 - `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
 
-## Batch E — Intake expansion *(blocked by B)*
+## Batch E — Intake expansion *(blocked by B — in progress, executed in waves)*
 APIs everywhere possible; scrape only as fallback. Pull the minimal fetcher seam from shelved Batch C as needed.
+Too big for one plan — each wave is its own plan/branch/PR (or an operational run with no PR):
+- **E1 — Research seed** *(operational, no plan doc)*: run `docs/CompanyResearchPrompt.md` via multi-agent workflow (per-channel/domain researchers → dedup → careers-URL verification against `docs/JobBoardDetection.md` patterns) → seeded `companies.json` + `ats_platform` histogram. Independent of E2; can run anytime.
+- **E2 — Registry infrastructure** *(plan/PR)*: the `2026-07-24-company-registry-discovery` spec's code — registry loader + example file, `type: companies` meta-source, gap-fill extract, URL harvesting, score context, wave gating.
+- **E3 — Mappers by demand** *(plan/PR; gated on E1's histogram)*: `2026-07-16-ashby-source` + SmartRecruiters; Workday/others only if the histogram justifies them.
+- **E4 — Scrape fallback** *(plan/PR)*: `2026-07-02-scrape-source` + `2026-07-03-js-fallback-fetcher` for the unknown-platform tail.
+- **E5 — Activation** *(operational)*: enable registry waves, watch the FIFO drain — hands off to Batch F.
 - `2026-07-16-ashby-source` — `type: ashby` posting-API source (UltiPro stays scrape-only)
 - `2026-07-02-scrape-source` — `type: scrape` careers pages (robots.txt, seen-skip, bs4)
 - `2026-07-03-js-fallback-fetcher` — `looks_js_shell` + Playwright `[browser]` extra
