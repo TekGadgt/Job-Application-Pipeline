@@ -57,6 +57,8 @@ def _new_frontmatter(mapped: dict, job_id: str, fuzzy: str) -> dict:
 
 def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
     imp = cfg.import_
+    if imp is None:
+        raise ValueError("config has no `import:` block — nothing to import")
     vault = cfg.output.vault.expanduser()
     root = imp.path.expanduser()
     summary = ImportSummary()
@@ -83,7 +85,7 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
             job_id = hashlib.sha256(url.encode()).hexdigest()[:16]
         else:
             job_id = hashlib.sha256(
-                str(note.relative_to(root)).encode()).hexdigest()[:16]
+                note.relative_to(root).as_posix().encode()).hexdigest()[:16]
         company = str(mapped.get("company", ""))
         title = str(mapped.get("position", ""))
         loc = str(mapped.get("location", ""))

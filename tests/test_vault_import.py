@@ -151,3 +151,21 @@ def test_rerun_heals_missing_seen_index_for_existing_note(tmp_path):
     assert s.seen_marked == 1                      # healed, not silently skipped
     h = hashlib.sha256(b"https://oldco.example/careers/123").hexdigest()[:16]
     assert SeenIndex(db).has_url(h)
+
+
+def test_run_import_without_block_raises_clear_error(tmp_path):
+    import pytest
+    cfg = PipelineConfig(stages=["dedup"], output=OutputConfig(vault=tmp_path / "vault"))
+    with pytest.raises(ValueError, match="import"):
+        run_import(cfg)
+
+
+def test_urlless_id_uses_posix_relative_path(tmp_path):
+    cfg, old = make_cfg(tmp_path)
+    sub = old / "2025"
+    sub.mkdir()
+    note = OLD_NOTE.replace("website: https://oldco.example/careers/123\n", "")
+    (sub / "oldco.md").write_text(note)
+    run_import(cfg)
+    _, fm, _ = read_note(tmp_path / "vault")
+    assert fm["job_id"] == hashlib.sha256(b"2025/oldco.md").hexdigest()[:16]
