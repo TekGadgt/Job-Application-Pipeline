@@ -1,11 +1,15 @@
 """Fail-fast config loading: profile.md (YAML frontmatter + prose) and pipeline.yaml."""
 from __future__ import annotations
 
+import json
+import logging
 import re
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
+
+log = logging.getLogger("job_pipeline")
 
 
 class Profile(BaseModel):
@@ -82,3 +86,40 @@ def load_profile(path: Path | str) -> Profile:
 def load_pipeline_config(path: Path | str) -> PipelineConfig:
     data = yaml.safe_load(Path(path).read_text()) or {}
     return PipelineConfig(**data)
+
+
+class CompanyEntry(BaseModel):
+    name: str
+    website: str | None = None
+    careers_url: str | None = None
+    ats_platform: str | None = None
+    slug: str | None = None
+    domain: str | None = None
+    company_size: str | None = None
+    stage: str | None = None
+    location: str | None = None
+    remote_policy: str | None = None
+    notes: str | None = None
+    source: str | None = None
+    enabled: bool = True
+
+
+def load_companies(path: Path | str) -> list[CompanyEntry]:
+    """Tolerant registry load: bad entries warn+skip, missing file warns+[]."""
+    path = Path(path).expanduser()
+    if not path.exists():
+        log.warning("companies registry %s not found; no companies loaded", path)
+        return []
+    entries: list[CompanyEntry] = []
+    for i, raw in enumerate(json.loads(path.read_text())):
+        try:
+            entries.append(CompanyEntry(**raw))
+        except Exception as exc:  # noqa: BLE001 — data file, never crash the run
+            log.warning("companies registry: skipping entry %d: %s", i, exc)
+    return entries
+
+
+def save_companies(path: Path | str, entries: list[CompanyEntry]) -> None:
+    Path(path).expanduser().write_text(
+        json.dumps([e.model_dump(exclude_none=False) for e in entries], indent=2) + "\n"
+    )

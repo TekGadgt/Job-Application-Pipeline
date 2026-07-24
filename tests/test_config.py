@@ -125,3 +125,36 @@ def test_import_unknown_canonical_fails_naming_key(tmp_path):
     p.write_text(PIPELINE + IMPORT_BLOCK.replace("company: company", "bogus: company"))
     with pytest.raises(ValidationError, match="bogus"):
         load_pipeline_config(p)
+
+
+COMPANIES = """[
+  {"name": "OldCo", "ats_platform": "greenhouse", "slug": "oldco",
+   "notes": "marketplace, Vue stack", "source": "claude_research_batch_1"},
+  {"name": "Disabled Inc", "ats_platform": "lever", "slug": "disabledinc", "enabled": false},
+  {"no_name": "broken entry"}
+]"""
+
+
+def test_load_companies_tolerant(tmp_path, caplog):
+    from job_pipeline.config import load_companies
+    p = tmp_path / "companies.json"
+    p.write_text(COMPANIES)
+    entries = load_companies(p)
+    assert [e.name for e in entries] == ["OldCo", "Disabled Inc"]   # bad entry skipped
+    assert entries[0].enabled is True                                # default
+    assert entries[1].enabled is False
+    assert "skipping" in caplog.text.lower()
+
+
+def test_load_companies_missing_file_warns_empty(tmp_path, caplog):
+    from job_pipeline.config import load_companies
+    assert load_companies(tmp_path / "nope.json") == []
+    assert "nope.json" in caplog.text
+
+
+def test_save_companies_round_trips(tmp_path):
+    from job_pipeline.config import CompanyEntry, load_companies, save_companies
+    p = tmp_path / "companies.json"
+    save_companies(p, [CompanyEntry(name="A", ats_platform="lever", slug="a")])
+    entries = load_companies(p)
+    assert entries[0].slug == "a"

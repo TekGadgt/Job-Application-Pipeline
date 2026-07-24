@@ -1,6 +1,8 @@
 # --- Personal data (never commit; ship *.example templates instead) ---
 config/profile.md
 config/pipeline.yaml
+config/companies.json
+companies.json
 *.seen.sqlite
 *.seen.db
 seen_index*.sqlite
