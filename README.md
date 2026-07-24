@@ -107,6 +107,31 @@ Three interfaces, each registered by name:
 
 Register a new adapter by name; core code is unchanged.
 
+#### Importing an existing tracker
+
+If you were tracking applications before adopting this pipeline, `job-pipeline import`
+converts an existing folder of markdown notes into pipeline-format notes in `output.vault`
+— zero tokens, no stages run. It's config-driven: a top-level `import:` block in
+`pipeline.yaml` maps pipeline-canonical frontmatter keys to your old notes' keys
+(see `config/pipeline.example.yaml` for the full shape), so it adapts to whatever
+frontmatter your old tracker evolved into without touching code. Each note's body is
+preserved verbatim below the remapped frontmatter. Imported notes get `status: imported`
+(never `to_review`, so they're permanently protected by skip-on-edit) and are marked in
+the seen-index, so future runs never re-surface them. Import never overwrites an existing
+target note, which makes it idempotent — safe to re-run as you clean up old notes.
+Use `--dry-run` to print the old-path → new-path plan without writing anything:
+
+```bash
+job-pipeline import --config config/pipeline.yaml --dry-run
+job-pipeline import --config config/pipeline.yaml
+```
+
+**Import vs. the `existing_vault` seeder — which do I want?** The `existing_vault`
+seeder makes the pipeline *ignore* old jobs (notes stay put, unchanged, just excluded
+from future dedup). `import` *adopts* old jobs into the output vault as real
+pipeline-format notes. Both remain — use the seeder for notes you're leaving where they
+are, `import` for notes you want converted into the pipeline's vault.
+
 Each stage lives in its own module — deterministic filters under
 `job_pipeline/stages/rules/`, agent stages under `job_pipeline/stages/agents/`.
 To write your own, copy the closest existing one as a template
@@ -145,7 +170,7 @@ unchanged.
 
 ## VEC Note Semantics
 
-Each published Obsidian note doubles as a Virginia Employment Commission (VEC) work-search record. The pipeline populates what it can from the listing (employer name, address, phone, position, source URL, discovery date). **Two fields you fill in yourself when you act:**
+Each published Obsidian note doubles as a Virginia Employment Commission (VEC) work-search record. The pipeline populates what it can from the listing (employer name, address, phone, position, source URL, discovery date, location). It also carries numeric compensation as frontmatter keys (`comp_min`/`comp_max`/`comp_currency`/`comp_period`) rendered into a human-readable `## Compensation` section in the body, and dedup metadata (`role_key`, the fuzzy-dedup key; `possible_duplicate`, set when a same-role match was found but not rejected — see the stage diagram). **Two fields you fill in yourself when you act:**
 
 - `date_of_contact` — the date you actually applied, called, or emailed.
 - `employer_contact_person` — the person you spoke/wrote to.
@@ -156,6 +181,16 @@ The pipeline never fakes an application. Finding a listing is not a VEC contact.
 VEC records must be retained ≥ 1 year; minimum two contacts per week.
 
 **Skip-on-edit protection:** if you advance a note's `status` past `to_review` (i.e., you have acted on it), a subsequent `job-pipeline run` will not overwrite it. Use `--force` to override.
+
+Note frontmatter carries three overlapping lifecycle fields, each with a distinct owner and purpose — they're deliberately not merged:
+
+| Field | Owner | Meaning |
+|---|---|---|
+| `status` | pipeline ↔ user | note lifecycle: `to_review` until you triage it; advancing it arms skip-on-edit |
+| `result_of_contact` | user (VEC) | VEC contact-record language: `found` → `applied` → `interview` → … |
+| `application_status` | user | application lifecycle: `Unsubmitted` → `Submitted` → `In Talks` → `Denied`/`Offered`/`Accepted` |
+
+`application_status` is free text — the vocabulary above is a suggestion, not an enum. Add your own values (`Ghosted`, `Withdrawn`, …) without touching code.
 
 ## Running Tests
 

@@ -19,3 +19,14 @@ stages: [dedup, hard_filter, extract, dedup_fuzzy, skill_gap, score, publish]
 models: {extract: haiku, skill_gap: sonnet, score: opus}
 output: {vault: ~/vault/jobs}
 limits: {max_agent_jobs_per_run: 40}   # overflow: FIFO; deferred jobs retry next run
+
+# One-time adoption of an existing tracker folder (job-pipeline import):
+# import:
+#   path: ~/Documents/old-job-tracker      # folder of old notes (recursive)
+#   fields:                                # pipeline-canonical <- old frontmatter key
+#     company: company
+#     position: position
+#     application_status: status
+#     date_of_contact: date-applied
+#     source_url: website
+#   keep_unmapped: true                    # carry unrecognized old keys through

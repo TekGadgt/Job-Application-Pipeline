@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 from job_pipeline.config import load_pipeline_config, load_profile
@@ -21,7 +22,28 @@ def main(argv: list[str] | None = None) -> int:
                      help="clear the seen-index entry for each --url before running")
     run.add_argument("--force", action="store_true", help="overwrite user-edited notes")
     run.add_argument("--mock", action="store_true", help="dry run with a mock agent")
+
+    imp = sub.add_parser("import", help="convert an existing tracker folder into pipeline notes")
+    imp.add_argument("--config", type=Path, default=Path("config/pipeline.yaml"))
+    imp.add_argument("--dry-run", action="store_true",
+                     help="print the per-note plan without writing anything")
     args = parser.parse_args(argv)
+
+    if args.cmd == "import":
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+        cfg = load_pipeline_config(args.config)
+        if cfg.import_ is None:
+            print("error: config has no `import:` block — see README "
+                  "'Importing an existing tracker'", file=sys.stderr)
+            return 2
+        from job_pipeline.store.vault_import import run_import
+        s = run_import(cfg, dry_run=args.dry_run)
+        if args.dry_run:
+            for old, new in s.planned:
+                print(f"  {old} -> {new}")
+        print(f"imported={s.imported} skipped_existing={s.skipped_existing} "
+              f"skipped_unparseable={s.skipped_unparseable} seen_marked={s.seen_marked}")
+        return 0
 
     if args.reprocess and not args.url:
         parser.error("--reprocess requires --url (no blanket un-marking)")
