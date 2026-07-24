@@ -158,3 +158,23 @@ def test_save_companies_round_trips(tmp_path):
     save_companies(p, [CompanyEntry(name="A", ats_platform="lever", slug="a")])
     entries = load_companies(p)
     assert entries[0].slug == "a"
+
+
+def test_load_companies_corrupt_file_warns_empty(tmp_path, caplog):
+    import logging
+    from job_pipeline.config import load_companies
+    caplog.set_level(logging.WARNING, logger="job_pipeline")
+    p = tmp_path / "companies.json"
+    p.write_text('[{"name": "truncated"')
+    assert load_companies(p) == []
+    assert "unreadable" in caplog.text.lower() or "invalid" in caplog.text.lower()
+
+
+def test_load_companies_non_list_warns_empty(tmp_path, caplog):
+    import logging
+    from job_pipeline.config import load_companies
+    caplog.set_level(logging.WARNING, logger="job_pipeline")
+    p = tmp_path / "companies.json"
+    p.write_text('{"name": "not a list"}')
+    assert load_companies(p) == []
+    assert "list" in caplog.text.lower()

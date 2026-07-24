@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 
@@ -110,8 +111,16 @@ def load_companies(path: Path | str) -> list[CompanyEntry]:
     if not path.exists():
         log.warning("companies registry %s not found; no companies loaded", path)
         return []
+    try:
+        raw_list = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        log.warning("companies registry %s is invalid/unreadable: %s", path, exc)
+        return []
+    if not isinstance(raw_list, list):
+        log.warning("companies registry %s: top level must be a list; ignoring", path)
+        return []
     entries: list[CompanyEntry] = []
-    for i, raw in enumerate(json.loads(path.read_text())):
+    for i, raw in enumerate(raw_list):
         try:
             entries.append(CompanyEntry(**raw))
         except Exception as exc:  # noqa: BLE001 — data file, never crash the run
@@ -120,6 +129,9 @@ def load_companies(path: Path | str) -> list[CompanyEntry]:
 
 
 def save_companies(path: Path | str, entries: list[CompanyEntry]) -> None:
-    Path(path).expanduser().write_text(
+    path = Path(path).expanduser()
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(
         json.dumps([e.model_dump(exclude_none=False) for e in entries], indent=2) + "\n"
     )
+    os.replace(tmp, path)
