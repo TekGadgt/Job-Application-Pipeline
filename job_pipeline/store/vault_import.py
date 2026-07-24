@@ -96,6 +96,11 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
         target = vault / f"{_slug(company)}-{_slug(title)}-{job_id[:8]}.md"
         if target.exists():
             summary.skipped_existing += 1
+            # heal the seen-index anyway: a prior run may have been interrupted
+            # between writing the note and marking, or the db replaced/lost
+            if seen is not None and (url or fuzzy):
+                seen.mark(job_id, fuzzy)
+                summary.seen_marked += 1
             continue
         if dry_run:
             summary.imported += 1

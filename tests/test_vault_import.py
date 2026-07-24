@@ -138,3 +138,16 @@ def test_import_body_without_leading_newline_stays_well_formed(tmp_path):
     _, fm, body = read_note(tmp_path / "vault")
     assert fm["company"] == "OldCo"          # frontmatter re-parses as a dict
     assert body == "\nbody glued to fence\n"
+
+
+def test_rerun_heals_missing_seen_index_for_existing_note(tmp_path):
+    cfg, old = make_cfg(tmp_path)
+    (old / "oldco.md").write_text(OLD_NOTE)
+    run_import(cfg)
+    db = tmp_path / "vault" / ".job_pipeline.seen.sqlite"
+    db.unlink()                                    # simulate interrupted run / lost db
+    s = run_import(cfg)
+    assert s.imported == 0 and s.skipped_existing == 1
+    assert s.seen_marked == 1                      # healed, not silently skipped
+    h = hashlib.sha256(b"https://oldco.example/careers/123").hexdigest()[:16]
+    assert SeenIndex(db).has_url(h)
