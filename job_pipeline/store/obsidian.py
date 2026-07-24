@@ -56,6 +56,8 @@ class ObsidianWriter:
         try:
             _, fm, _ = text.split("---", 2)
             data = yaml.safe_load(fm) or {}
+            if not isinstance(data, dict):
+                return True   # frontmatter isn't a mapping: user-owned, never clobber
             return (data.get("status") != "to_review"
                     or data.get("application_status", "Unsubmitted") != "Unsubmitted")
         except (ValueError, yaml.YAMLError):

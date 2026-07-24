@@ -201,3 +201,11 @@ def test_malformed_yaml_frontmatter_treated_as_user_owned(tmp_path):
     path = w.write(j)
     path.write_text("---\nbad: [oops\n---\nbody\n")
     assert w.is_user_touched(j)   # must not raise
+
+
+def test_list_frontmatter_treated_as_user_owned(tmp_path):
+    w = ObsidianWriter(tmp_path)
+    j = scored_job()
+    path = w.write(j)
+    path.write_text("---\n- a\n- b\n---\nbody\n")
+    assert w.is_user_touched(j)   # valid yaml, wrong shape: must not raise

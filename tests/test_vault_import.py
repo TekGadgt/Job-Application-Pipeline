@@ -119,7 +119,8 @@ def test_dry_run_writes_nothing(tmp_path):
     s = run_import(cfg, dry_run=True)
     assert s.imported == 1 and len(s.planned) == 1
     assert not list((tmp_path / "vault").glob("*.md"))
-    assert SeenIndex(tmp_path / "vault" / ".job_pipeline.seen.sqlite").count() == 0
+    # pure existence check: instantiating SeenIndex would itself create the dir/db
+    assert not (tmp_path / "vault" / ".job_pipeline.seen.sqlite").exists()
 
 
 def test_dry_run_does_not_create_vault_dir(tmp_path):
@@ -127,3 +128,13 @@ def test_dry_run_does_not_create_vault_dir(tmp_path):
     (old / "oldco.md").write_text(OLD_NOTE)
     run_import(cfg, dry_run=True)
     assert not (tmp_path / "vault").exists()
+
+
+def test_import_body_without_leading_newline_stays_well_formed(tmp_path):
+    cfg, old = make_cfg(tmp_path)
+    (old / "sloppy.md").write_text("---\nposition: Engineer\ncompany: OldCo\n---body glued to fence\n")
+    s = run_import(cfg)
+    assert s.imported == 1
+    _, fm, body = read_note(tmp_path / "vault")
+    assert fm["company"] == "OldCo"          # frontmatter re-parses as a dict
+    assert body == "\nbody glued to fence\n"

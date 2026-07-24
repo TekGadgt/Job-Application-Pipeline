@@ -107,6 +107,8 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
             for key, value in old.items():
                 if key not in consumed and key not in new_fm:
                     new_fm[key] = value
+        if not body.startswith(("\n", "\r")):
+            body = "\n" + body   # keep the closing fence on its own line
         target.write_text(
             "---\n" + yaml.safe_dump(new_fm, sort_keys=False) + "---" + body
         )
