@@ -28,3 +28,7 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# --- Claude Code session scratch (worktrees, SDD ledgers) ---
+.claude/
+.superpowers/
