@@ -58,7 +58,7 @@ class ObsidianWriter:
             data = yaml.safe_load(fm) or {}
             return (data.get("status") != "to_review"
                     or data.get("application_status", "Unsubmitted") != "Unsubmitted")
-        except ValueError:
+        except (ValueError, yaml.YAMLError):
             return True   # malformed note: treat as user-owned, never clobber
 
     def write(self, job: Job) -> Path:

@@ -120,3 +120,10 @@ def test_dry_run_writes_nothing(tmp_path):
     assert s.imported == 1 and len(s.planned) == 1
     assert not list((tmp_path / "vault").glob("*.md"))
     assert SeenIndex(tmp_path / "vault" / ".job_pipeline.seen.sqlite").count() == 0
+
+
+def test_dry_run_does_not_create_vault_dir(tmp_path):
+    cfg, old = make_cfg(tmp_path)
+    (old / "oldco.md").write_text(OLD_NOTE)
+    run_import(cfg, dry_run=True)
+    assert not (tmp_path / "vault").exists()

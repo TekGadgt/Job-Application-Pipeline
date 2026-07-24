@@ -60,7 +60,7 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
     vault = cfg.output.vault.expanduser()
     root = imp.path.expanduser()
     summary = ImportSummary()
-    seen = SeenIndex(vault / ".job_pipeline.seen.sqlite")
+    seen = None if dry_run else SeenIndex(vault / ".job_pipeline.seen.sqlite")
     if not dry_run:
         vault.mkdir(parents=True, exist_ok=True)
     for note in sorted(root.rglob("*.md")):
@@ -114,5 +114,6 @@ def run_import(cfg: PipelineConfig, dry_run: bool = False) -> ImportSummary:
         if url or fuzzy:
             seen.mark(job_id, fuzzy)
             summary.seen_marked += 1
-    seen.close()
+    if seen is not None:
+        seen.close()
     return summary

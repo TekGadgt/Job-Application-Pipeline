@@ -193,3 +193,11 @@ def test_legacy_note_without_application_status_uses_status_only(tmp_path):
     # simulate a pre-feature note: drop the application_status line entirely
     path.write_text(path.read_text().replace("application_status: Unsubmitted\n", ""))
     assert not w.is_user_touched(j)
+
+
+def test_malformed_yaml_frontmatter_treated_as_user_owned(tmp_path):
+    w = ObsidianWriter(tmp_path)
+    j = scored_job()
+    path = w.write(j)
+    path.write_text("---\nbad: [oops\n---\nbody\n")
+    assert w.is_user_touched(j)   # must not raise
