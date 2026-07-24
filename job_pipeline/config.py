@@ -22,6 +22,28 @@ class Limits(BaseModel):
     max_agent_jobs_per_run: int = Field(default=40, gt=0)
 
 
+CANONICAL_IMPORT_KEYS = frozenset({
+    "company", "position", "location", "type_of_work", "source_url",
+    "date_found", "date_of_contact", "employer_address", "employer_phone",
+    "employer_email", "employer_contact_person", "result_of_contact",
+    "application_status", "score",
+})
+
+
+class ImportConfig(BaseModel):
+    path: Path
+    fields: dict[str, str] = {}
+    keep_unmapped: bool = True
+
+    @field_validator("fields")
+    @classmethod
+    def _only_canonical_keys(cls, v: dict[str, str]) -> dict[str, str]:
+        unknown = sorted(set(v) - CANONICAL_IMPORT_KEYS)
+        if unknown:
+            raise ValueError(f"unknown canonical import field(s): {', '.join(unknown)}")
+        return v
+
+
 class PipelineConfig(BaseModel):
     sources: list[dict] = []
     seeders: list[dict] = []
@@ -29,6 +51,7 @@ class PipelineConfig(BaseModel):
     models: dict[str, str] = {}
     output: OutputConfig
     limits: Limits = Limits()
+    import_: ImportConfig | None = Field(default=None, alias="import")
 
     # A yaml key whose entries are all commented out parses as None, not empty.
     @field_validator("sources", "seeders", mode="before")
