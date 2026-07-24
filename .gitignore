@@ -5,6 +5,7 @@ config/pipeline.yaml
 *.seen.db
 seen_index*.sqlite
 /vault/
+docs/CompanyResearchPrompt.md
 # Anything a user points at their own vault/output
 output/
 
