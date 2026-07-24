@@ -24,6 +24,18 @@ output: {vault: /tmp/vault, keep_rejects: true}
 limits: {max_agent_jobs_per_run: 40}
 """
 
+IMPORT_BLOCK = """
+import:
+  path: /tmp/old-tracker
+  fields:
+    company: company
+    position: position
+    application_status: status
+    date_of_contact: date-applied
+    source_url: website
+  keep_unmapped: true
+"""
+
 
 def test_load_profile_parses_frontmatter_and_body(tmp_path):
     p = tmp_path / "profile.md"
@@ -91,3 +103,25 @@ def test_pipeline_config_treats_commented_out_sections_as_empty(tmp_path):
     assert cfg.sources == []
     assert cfg.seeders == []
     assert cfg.models == {}
+
+
+def test_import_block_parses(tmp_path):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(PIPELINE + IMPORT_BLOCK)
+    cfg = load_pipeline_config(p)
+    assert cfg.import_ is not None
+    assert cfg.import_.fields["application_status"] == "status"
+    assert cfg.import_.keep_unmapped is True
+
+
+def test_import_block_absent_is_none(tmp_path):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(PIPELINE)
+    assert load_pipeline_config(p).import_ is None
+
+
+def test_import_unknown_canonical_fails_naming_key(tmp_path):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(PIPELINE + IMPORT_BLOCK.replace("company: company", "bogus: company"))
+    with pytest.raises(ValidationError, match="bogus"):
+        load_pipeline_config(p)

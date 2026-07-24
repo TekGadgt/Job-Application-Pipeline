@@ -92,3 +92,58 @@ def test_reprocess_clears_seen_row_before_run(monkeypatch, tmp_path):
                    "--mock", "--url", url, "--reprocess"])
     assert rc == 0
     assert not SeenIndex(vault / ".job_pipeline.seen.sqlite").has_url(h)
+
+
+OLD_NOTE = """---
+position: Engineer
+company: OldCo
+website: https://oldco.example/1
+---
+Body.
+"""
+
+IMPORT_YAML = """
+stages: [dedup]
+models: {{extract: haiku, skill_gap: sonnet, score: opus}}
+output: {{vault: {vault}}}
+import:
+  path: {old}
+  fields:
+    company: company
+    position: position
+    source_url: website
+"""
+
+
+def test_import_command_imports(tmp_path, capsys):
+    old = tmp_path / "old"
+    old.mkdir()
+    (old / "a.md").write_text(OLD_NOTE)
+    vault = tmp_path / "vault"
+    cfg = tmp_path / "pipeline.yaml"
+    cfg.write_text(IMPORT_YAML.format(vault=vault, old=old))
+    rc = cli.main(["import", "--config", str(cfg)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "imported=1 skipped_existing=0 skipped_unparseable=0 seen_marked=1" in out
+    assert len(list(vault.glob("*.md"))) == 1
+
+
+def test_import_dry_run_writes_nothing(tmp_path, capsys):
+    old = tmp_path / "old"
+    old.mkdir()
+    (old / "a.md").write_text(OLD_NOTE)
+    vault = tmp_path / "vault"
+    cfg = tmp_path / "pipeline.yaml"
+    cfg.write_text(IMPORT_YAML.format(vault=vault, old=old))
+    rc = cli.main(["import", "--config", str(cfg), "--dry-run"])
+    assert rc == 0
+    assert "->" in capsys.readouterr().out       # per-note plan printed
+    assert not list(vault.glob("*.md"))
+
+
+def test_import_errors_without_block(tmp_path, capsys):
+    cfg, _ = _write_configs(tmp_path)             # PIPELINE has no import: block
+    rc = cli.main(["import", "--config", str(cfg)])
+    assert rc == 2
+    assert "import" in capsys.readouterr().err
