@@ -160,3 +160,17 @@ def test_banned_platform_resolution_does_not_persist_when_other_entry_is_dirty(t
     assert banned["slug"] is None
     good = next(e for e in saved if e["name"] == "Slugless Good")
     assert good["ats_platform"] == "greenhouse" and good["slug"] == "goodco"
+
+
+def test_supported_platform_missing_slug_warns_distinctly(tmp_path, caplog):
+    import logging
+    caplog.set_level(logging.WARNING, logger="job_pipeline")
+    p = make_registry(tmp_path, [
+        {"name": "Slugless Greenhouse Co", "ats_platform": "greenhouse",
+         "slug": None, "enabled": True},
+    ])
+    assert CompaniesSource(file=p, make=lambda a, s: FakeATS([])).fetch() == []
+    assert "has no slug" in caplog.text
+    assert "Slugless Greenhouse Co" in caplog.text
+    # must NOT be reported as an unsupported-platform entry
+    assert "await unsupported-platform mappers" not in caplog.text

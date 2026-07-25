@@ -145,6 +145,9 @@ def save_companies(path: Path | str, entries: list[CompanyEntry]) -> None:
             raw_list = json.loads(path.read_text())
             if isinstance(raw_list, list):
                 for raw in raw_list:
+                    if not isinstance(raw, dict):
+                        log.warning("companies registry %s: dropping non-object entry %r", path, raw)
+                        continue
                     try:
                         CompanyEntry(**raw)
                     except Exception:  # noqa: BLE001 — unparseable: preserve verbatim

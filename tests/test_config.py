@@ -229,3 +229,18 @@ def test_save_companies_ignores_non_list_existing_file(tmp_path):
         CompanyEntry(name="A", ats_platform="lever", slug="a").model_dump(exclude_none=False)
     ]
     assert all(isinstance(e, dict) for e in saved)   # no bare strings from dict keys
+
+
+def test_save_companies_drops_non_dict_entries(tmp_path, caplog):
+    import logging
+    from job_pipeline.config import load_companies, save_companies
+    caplog.set_level(logging.WARNING, logger="job_pipeline")
+    p = tmp_path / "companies.json"
+    # valid list, but with stray non-object elements mixed in
+    p.write_text('[{"name": "Good"}, "stray string", 42, {"no_name": true}]')
+    save_companies(p, load_companies(p))
+    saved = json.loads(p.read_text())
+    assert all(isinstance(e, dict) for e in saved)      # schema never violated
+    assert {"no_name": True} in saved                   # dict-shaped unparseable still preserved
+    assert [e for e in saved if e.get("name") == "Good"]
+    assert "non-object entry" in caplog.text

@@ -79,8 +79,12 @@ class CompaniesSource:
             if entry.ats_platform in BANNED:
                 log.warning("refusing %s (%s): banned platform", entry.name, entry.ats_platform)
                 continue
-            if entry.ats_platform not in SUPPORTED or not entry.slug:
+            if entry.ats_platform not in SUPPORTED:
                 unsupported += 1
+                continue
+            if not entry.slug:
+                log.warning("companies: %s (%s) has no slug; set one or give it a "
+                            "careers_url the detector recognizes", entry.name, entry.ats_platform)
                 continue
             pair = (entry.ats_platform, entry.slug)
             if pair in fetched_pairs:
