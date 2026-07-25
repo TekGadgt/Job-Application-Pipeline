@@ -37,8 +37,19 @@ iCIMS
   fetcher, not a tier-2 mapper. Treat tier placement above as aspirational until re-verified per tenant.
 
 Jibe / jibeapply (iCIMS career-site front end; Jibe was acquired by iCIMS)
-- Detection Pattern: {company}.jibeapply.com  (UNVERIFIED — pattern not yet confirmed against a live board)
-- Method: unknown; JS-rendered per field report. Investigate for a JSON endpoint before assuming scrape.
+- Detection Pattern: {company}.jibeapply.com  (VERIFIED against githubinc.jibeapply.com)
+- API Endpoint: NONE — probed 2026-07-25: `/api/jobs/{id}` returns 200 but serves the Angular
+  catch-all as text/html; `/jobs/{id}.json`, `/api/v1/jobs/{id}`, `?format=json` all 404.
+- Method: **JSON-LD `JobPosting`, server-rendered in the page** — no browser required.
+  Verified on `githubinc.jibeapply.com/jobs/5623`: title, `hiringOrganization.name` = "GitHub, Inc."
+  (the REAL employer), 13.4KB description, datePosted, employmentType. Caveats: `jobLocation` is
+  `"UNAVAILABLE"` placeholders and `baseSalary` is all zeros — location and comp must come from the
+  description text.
+- ⚠️ Sizes (why this matters): raw HTML 576,451 chars (~144k tokens if sent to extract); visible text
+  after stripping scripts only 1,967 chars → ratio 0.0034, so `looks_js_shell` would call it a SHELL and
+  launch Playwright unnecessarily. The JSON-LD description alone is 7,136 chars (~1.8k tokens).
+  See `docs/superpowers/specs/2026-07-25-jsonld-jobposting-design.md` — JSON-LD parsing must run
+  BEFORE the shell heuristic.
 - Notes: Shows up as the PUBLIC alternative when a company's own icims.com tenant is auth/IP-gated
   (observed for GitHub). Not currently in `job_pipeline/ats_patterns.py`, so `detect()` returns None
   for these URLs and URL-harvesting skips them.
