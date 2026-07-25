@@ -267,3 +267,13 @@ def test_load_companies_binary_file_warns_empty(tmp_path, caplog):
     p.write_bytes(b"\xff\xfe\x00not utf-8 at all")
     assert load_companies(p) == []          # must not raise UnicodeDecodeError
     assert "invalid/unreadable" in caplog.text
+
+
+def test_save_companies_survives_binary_existing_registry(tmp_path):
+    """UnicodeDecodeError subclasses ValueError, which the preservation
+    try/except already catches — pin it so narrowing that clause fails loudly."""
+    from job_pipeline.config import CompanyEntry, load_companies, save_companies
+    p = tmp_path / "companies.json"
+    p.write_bytes(b"\xff\xfe\x00binary garbage not utf-8")
+    save_companies(p, [CompanyEntry(name="NewCo", slug="newco", ats_platform="lever")])
+    assert load_companies(p)[0].name == "NewCo"   # write went through, nothing raised
