@@ -1,10 +1,15 @@
 # --- Personal data (never commit; ship *.example templates instead) ---
 config/profile.md
 config/pipeline.yaml
+config/companies.json
+companies.json
+config/Connections.csv
+Connections.csv
 *.seen.sqlite
 *.seen.db
 seen_index*.sqlite
 /vault/
+docs/CompanyResearchPrompt.md
 # Anything a user points at their own vault/output
 output/
 

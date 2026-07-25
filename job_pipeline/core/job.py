@@ -15,6 +15,7 @@ class Job:
     fetched_at: datetime
     id: str = ""                       # stable hash(url) — primary dedup key
     extract_hint: str = ""             # per-source hint prepended to the extract prompt
+    company_context: str = ""          # registry fit-notes, fed to the score agent
     # after extract (agent)
     title: str = ""
     company: str = ""

@@ -20,6 +20,7 @@ import job_pipeline.stages.agents     # noqa: F401
 import job_pipeline.stages.publish    # noqa: F401
 import job_pipeline.sources.manual    # noqa: F401
 import job_pipeline.sources.feeds     # noqa: F401
+import job_pipeline.sources.companies  # noqa: F401
 import job_pipeline.seeders.existing_vault  # noqa: F401
 
 log = logging.getLogger("job_pipeline")
@@ -97,6 +98,17 @@ def run_pipeline(cfg: PipelineConfig, profile: Profile, runner: AgentRunner,
         for j in fetched:
             origin[j.id] = src
             jobs.append(j)
+
+    registry_file = next(
+        (s.get("file") for s in cfg.sources if s.get("type") == "companies"), None)
+    if registry_file:
+        manual_urls = [j.url for j in jobs if j.source == "manual"]
+        if manual_urls:
+            from job_pipeline.sources.companies import harvest_urls
+            try:
+                harvest_urls(registry_file, manual_urls)
+            except Exception as exc:  # noqa: BLE001 — never crash the run over data
+                log.warning("url harvesting into %s failed: %s", registry_file, exc)
 
     stages = build_stages(cfg, profile, seen, runner, writer, force)
     result = DeterministicOrchestrator(cfg.limits.max_agent_jobs_per_run).run(jobs, stages)

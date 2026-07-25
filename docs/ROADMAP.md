@@ -13,12 +13,19 @@ Everything that lands in notes; one golden-test rebase for all three, plus the n
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
 - `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
 
-## Batch E — Intake expansion *(blocked by B)*
+## Batch E — Intake expansion *(blocked by B — in progress, executed in waves)*
 APIs everywhere possible; scrape only as fallback. Pull the minimal fetcher seam from shelved Batch C as needed.
+Too big for one plan — each wave is its own plan/branch/PR (or an operational run with no PR):
+- **E1 — Research seed** *(operational, no plan doc)*: run `docs/CompanyResearchPrompt.md` via multi-agent workflow (per-channel/domain researchers → dedup → careers-URL verification against `docs/JobBoardDetection.md` patterns) → seeded `companies.json` + `ats_platform` histogram. Independent of E2; can run anytime.
+  - **E1b — LinkedIn follow-up batch** *(pending: Ryan's LinkedIn data export, requested 2026-07-23, second archive not yet delivered)*: connections → their companies → boards via the detection patterns; registry entries tagged `source: "linkedin_export"`. Re-runs only the research/merge step — no new code (registry schema already accommodates it). Additional follow-up batches come from E1's own summary suggestions, each with a distinct `source` tag.
+- **E2 — Registry infrastructure** *(plan/PR)*: the `2026-07-24-company-registry-discovery` spec's code — registry loader + example file, `type: companies` meta-source, gap-fill extract, URL harvesting, score context, wave gating.
+- **E3 — Mappers by demand** *(plan/PR; gated on E1's histogram)*: `2026-07-16-ashby-source` + SmartRecruiters; Workday/others only if the histogram justifies them.
+- **E4 — Scrape fallback** *(plan/PR)*: `2026-07-02-scrape-source` + `2026-07-03-js-fallback-fetcher` for the unknown-platform tail.
+- **E5 — Activation** *(operational)*: enable registry waves, watch the FIFO drain — hands off to Batch F.
 - `2026-07-16-ashby-source` — `type: ashby` posting-API source (UltiPro stays scrape-only)
 - `2026-07-02-scrape-source` — `type: scrape` careers pages (robots.txt, seen-skip, bs4)
 - `2026-07-03-js-fallback-fetcher` — `looks_js_shell` + Playwright `[browser]` extra
-- **Company discovery (spec TBD, brainstorm at batch start)** — "what adding new sources looks like." Candidate intakes: (1) initial curated sweep of companies matching Ryan's experience; (2) HN "Who is hiring?" RSS mined for *companies and their ATS board links*, not listings; (3) LinkedIn data export → connections' companies → their job boards; (4) slug-harvesting from board URLs already flowing through the manual inbox; (5) a company-sourcing prompt from a friend of Ryan's (proven in her search; Ryan is tweaking it and will drop it in the repo — location TBD). Note: Greenhouse/Lever/Ashby have no first-party "list all boards" endpoint — discovery is ours to build.
+- `2026-07-24-company-registry-discovery` — `companies.json` machine-owned registry + `type: companies` meta-source, gap-filling extract (prefilled fields become authoritative), URL harvesting via `docs/JobBoardDetection.md` patterns, score-agent company context, wave-gated activation. Seeding = running `docs/CompanyResearchPrompt.md` via multi-agent research (operational step, before mapper build-out; ats_platform histogram picks tier-2 mappers — SmartRecruiters first, Workable never). LinkedIn-export intake deferred.
 
 ## Batch F — Observability *(blocked by E — the source fan-out makes it urgent)*
 - `2026-07-03-observability-run-history` — errored guard, terminal-outcome logging, `runs`/`run_jobs` tables, `log`/`why` commands. (Item 5, keep_rejects retirement, is fast-forwarded by Batch L.)

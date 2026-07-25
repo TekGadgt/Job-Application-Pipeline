@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Example Co",
+    "website": "https://example.com",
+    "careers_url": "https://boards.greenhouse.io/exampleco",
+    "ats_platform": "greenhouse",
+    "slug": "exampleco",
+    "domain": "developer tools",
+    "company_size": "scaleup",
+    "stage": "series_b",
+    "location": "Remote",
+    "remote_policy": "fully_remote",
+    "notes": "Why this company fits — the score agent reads this.",
+    "source": "claude_research_batch_1",
+    "contacts": ["Jane Doe — Staff Engineer"],
+    "enabled": true
+  }
+]

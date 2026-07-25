@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, UTC
 from pathlib import Path
 from job_pipeline.config import Profile, PipelineConfig, OutputConfig, Limits
@@ -146,3 +147,23 @@ def test_unmark_lets_a_seen_url_republish(tmp_path):
     s3 = run_pipeline(cfg, prof, MockRunner(list(replies)),
                       sources=[FakeSource([job(url, "listing")])], db_path=db)
     assert s3.published == 1                     # reprocessed successfully
+
+
+def test_manual_job_matching_known_ats_is_harvested_into_registry(tmp_path):
+    registry_path = tmp_path / "companies.json"
+    registry_path.write_text("[]")
+    cfg = PipelineConfig(
+        sources=[{"type": "companies", "file": str(registry_path)}],
+        stages=["dedup"],
+        output=OutputConfig(vault=tmp_path / "vault"),
+        limits=Limits(max_agent_jobs_per_run=10),
+    )
+    manual_job = Job(source="manual", url="https://boards.greenhouse.io/newco/jobs/1",
+                      raw_text="listing", fetched_at=datetime.now(UTC))
+    src = FakeSource([manual_job])
+    run_pipeline(cfg, make_profile(), MockRunner([]),
+                 sources=[src], db_path=tmp_path / "seen.sqlite")
+    saved = json.loads(registry_path.read_text())
+    assert len(saved) == 1
+    assert saved[0]["ats_platform"] == "greenhouse" and saved[0]["slug"] == "newco"
+    assert saved[0]["source"] == "url_harvest"

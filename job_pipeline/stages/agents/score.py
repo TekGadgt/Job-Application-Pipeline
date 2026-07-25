@@ -26,7 +26,7 @@ The rationale should be 2-4 sentences naming the decisive factors.
 CANDIDATE PROFILE AND PREFERENCES:
 {profile_body}
 
-JOB: {title} at {company} ({location}) — {comp_text}
+{company_context}JOB: {title} at {company} ({location}) — {comp_text}
 DESCRIPTION: {description}
 SKILL GAP: {skill_gap}"""
 
@@ -42,10 +42,14 @@ class ScoreStage:
         self.runner, self.model, self.profile = runner, model, profile
 
     def run(self, job: Job) -> Job:
+        company_context = (
+            f"COMPANY CONTEXT: {job.company_context}\n\n" if job.company_context else ""
+        )
         reply = self.runner.run(
             _fill(
                 SCORE_PROMPT,
                 profile_body=self.profile.body,
+                company_context=company_context,
                 title=job.title, company=job.company, location=job.location,
                 comp_text=job.comp_text, description=job.description,
                 skill_gap=job.skill_gap,
