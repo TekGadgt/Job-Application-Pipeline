@@ -31,3 +31,21 @@ def test_detect_known_platforms(url, expected):
 def test_detect_unknown_returns_none():
     assert detect("https://example.com/careers") is None
     assert detect("not a url") is None
+
+
+VENDOR_ROOTS = [
+    "https://www.icims.com", "https://www.bamboohr.com", "https://www.taleo.net",
+    "https://www.teamtailor.com", "https://www.eightfold.ai", "https://www.breezy.hr",
+    "https://www.recruitee.com", "https://www.oraclecloud.com",
+]
+
+
+@pytest.mark.parametrize("url", VENDOR_ROOTS)
+def test_detect_rejects_vendor_marketing_roots(url):
+    assert detect(url) is None
+
+
+def test_detect_rejects_lookalike_and_unqualified_urls():
+    assert detect("https://myboards.greenhouse.io/exampleco") is None
+    assert detect("https://exampleco.oraclecloud.com/some/erp/app") is None
+    assert detect("https://exampleco.bamboohr.com/") is None
