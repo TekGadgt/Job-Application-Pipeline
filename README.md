@@ -162,7 +162,7 @@ Enable it with one source line:
 
 ```yaml
 sources:
-  - {type: companies, file: companies.json}
+  - {type: companies, file: config/companies.json}
 ```
 
 **`notes` feeds the score agent.** Whatever you put in an entry's `notes` field (e.g.
@@ -185,9 +185,10 @@ skipped, so you can flip companies on in waves by editing `companies.json` witho
 touching `pipeline.yaml` or code.
 
 **Workable is refused outright.** `apply.workable.com` boards are known to
-aggressively IP-ban scrapers, so entries with `ats_platform: workable` are logged and
-skipped unconditionally, regardless of `enabled` — there's no supported way to fetch
-them yet.
+aggressively IP-ban scrapers, so *enabled* entries with `ats_platform: workable` are
+logged and skipped every run — there's no supported way to fetch them yet. (A
+`disabled` Workable entry is simply skipped like any other disabled entry, silently,
+before the banned-platform check ever runs.)
 
 **Unsupported platforms are counted, not fetched.** `detect()` recognizes more ATS
 platforms (Ashby, SmartRecruiters, Workday, iCIMS, ...) than the pipeline has fetchers

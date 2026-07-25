@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 log = logging.getLogger("job_pipeline")
 
@@ -90,6 +90,8 @@ def load_pipeline_config(path: Path | str) -> PipelineConfig:
 
 
 class CompanyEntry(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     name: str
     website: str | None = None
     careers_url: str | None = None
@@ -129,9 +131,25 @@ def load_companies(path: Path | str) -> list[CompanyEntry]:
 
 
 def save_companies(path: Path | str, entries: list[CompanyEntry]) -> None:
+    """Rewrite the registry, carrying forward entries the loader could not parse.
+
+    load_companies() silently drops entries that fail validation; if we then
+    write out only the successfully-parsed entries, that loss becomes
+    permanent. Re-read the file here and preserve any unparsable entries
+    verbatim so a load -> save round trip never destroys data.
+    """
     path = Path(path).expanduser()
+    unparsed: list[dict] = []
+    if path.exists():
+        try:
+            for raw in json.loads(path.read_text()):
+                try:
+                    CompanyEntry(**raw)
+                except Exception:  # noqa: BLE001 — unparseable: preserve verbatim
+                    unparsed.append(raw)
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            pass   # unreadable file: nothing to preserve
+    payload = [e.model_dump(exclude_none=False) for e in entries] + unparsed
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(
-        json.dumps([e.model_dump(exclude_none=False) for e in entries], indent=2) + "\n"
-    )
+    tmp.write_text(json.dumps(payload, indent=2) + "\n")
     os.replace(tmp, path)

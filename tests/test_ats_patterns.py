@@ -49,3 +49,22 @@ def test_detect_rejects_lookalike_and_unqualified_urls():
     assert detect("https://myboards.greenhouse.io/exampleco") is None
     assert detect("https://exampleco.oraclecloud.com/some/erp/app") is None
     assert detect("https://exampleco.bamboohr.com/") is None
+
+
+def test_detect_greenhouse_embed_prefers_for_query_param():
+    # FINDING 2: embed/job_app URLs must not register the reserved segment
+    # ("embed"/"job_app"/"job_board") as the company slug.
+    assert detect(
+        "https://boards.greenhouse.io/embed/job_app?token=1&for=acme"
+    ) == ("greenhouse", "acme")
+
+
+def test_detect_greenhouse_embed_without_for_param_is_none():
+    assert detect("https://boards.greenhouse.io/embed/job_app?token=1") is None
+
+
+def test_detect_eightfold_is_path_qualified():
+    # FINDING 4: eightfold must require /careers, like oraclecloud/bamboohr.
+    assert detect("https://exampleco.eightfold.ai/careers") == ("eightfold", "exampleco")
+    assert detect("https://blog.eightfold.ai/post/1") is None
+    assert detect("https://resources.eightfold.ai/x") is None

@@ -105,7 +105,10 @@ def run_pipeline(cfg: PipelineConfig, profile: Profile, runner: AgentRunner,
         manual_urls = [j.url for j in jobs if j.source == "manual"]
         if manual_urls:
             from job_pipeline.sources.companies import harvest_urls
-            harvest_urls(registry_file, manual_urls)
+            try:
+                harvest_urls(registry_file, manual_urls)
+            except Exception as exc:  # noqa: BLE001 — never crash the run over data
+                log.warning("url harvesting into %s failed: %s", registry_file, exc)
 
     stages = build_stages(cfg, profile, seen, runner, writer, force)
     result = DeterministicOrchestrator(cfg.limits.max_agent_jobs_per_run).run(jobs, stages)

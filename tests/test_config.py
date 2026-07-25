@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from pydantic import ValidationError
 from job_pipeline.config import load_profile, load_pipeline_config
@@ -178,3 +180,29 @@ def test_load_companies_non_list_warns_empty(tmp_path, caplog):
     p.write_text('{"name": "not a list"}')
     assert load_companies(p) == []
     assert "list" in caplog.text.lower()
+
+
+def test_load_save_round_trip_preserves_extra_keys_and_unparsable_entries(tmp_path):
+    """FINDING 1: save_companies must not silently destroy data.
+
+    Extra keys on a valid entry must round-trip (CompanyEntry allows extra),
+    and an entry the loader could not parse at all must still be present in
+    the file after a load -> save cycle (carried forward verbatim).
+    """
+    from job_pipeline.config import load_companies, save_companies
+
+    p = tmp_path / "companies.json"
+    p.write_text(json.dumps([
+        {"name": "GoodCo", "ats_platform": "greenhouse", "slug": "goodco", "priority": 1},
+        {"no_name": True},
+    ]))
+    entries = load_companies(p)
+    assert len(entries) == 1   # only the valid entry parses
+    save_companies(p, entries)
+
+    saved = json.loads(p.read_text())
+    assert len(saved) == 2
+    good = next(e for e in saved if e.get("name") == "GoodCo")
+    assert good["priority"] == 1                      # extra key round-tripped
+    invalid = next(e for e in saved if e.get("no_name") is True)
+    assert invalid == {"no_name": True}                # unparsable entry preserved verbatim

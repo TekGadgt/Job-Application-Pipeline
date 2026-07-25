@@ -14,15 +14,17 @@ log = logging.getLogger("job_pipeline")
 BANNED = {"workable"}   # aggressive IP bans — see docs/JobBoardDetection.md
 
 
+# Single source of truth for maker functions; SUPPORTED is derived so the two
+# structures can't drift apart (E3 extends _MAKERS: ashby, smartrecruiters, ...).
+_MAKERS = {
+    "greenhouse": lambda slug: get_source("greenhouse")(board=slug),
+    "lever": lambda slug: get_source("lever")(org=slug),
+}
+SUPPORTED = set(_MAKERS)
+
+
 def _default_make(ats: str, slug: str):
-    if ats == "greenhouse":
-        return get_source("greenhouse")(board=slug)
-    if ats == "lever":
-        return get_source("lever")(org=slug)
-    raise KeyError(ats)
-
-
-SUPPORTED = {"greenhouse", "lever"}   # E3 extends: ashby, smartrecruiters, ...
+    return _MAKERS[ats](slug)
 
 
 def harvest_urls(registry_path: Path | str, urls: list[str]) -> int:
@@ -35,6 +37,8 @@ def harvest_urls(registry_path: Path | str, urls: list[str]) -> int:
         if not hit or hit in known:
             continue
         ats, slug = hit
+        if ats in BANNED:
+            continue
         entries.append(CompanyEntry(name=slug, ats_platform=ats, slug=slug,
                                     source="url_harvest", enabled=True))
         known.add(hit)
@@ -56,6 +60,7 @@ class CompaniesSource:
         jobs: list[Job] = []
         unsupported = 0
         dirty = False
+        fetched_pairs: set[tuple[str, str]] = set()
         for entry in entries:
             if not entry.enabled:
                 continue
@@ -63,13 +68,21 @@ class CompaniesSource:
                 hit = detect(entry.careers_url)
                 if hit:
                     entry.ats_platform, entry.slug = hit
-                    dirty = True
+                    # Don't persist a banned-platform resolution (FINDING 6b):
+                    # let the BANNED check below log+skip it every run instead.
+                    dirty = dirty or hit[0] not in BANNED
             if entry.ats_platform in BANNED:
                 log.warning("refusing %s (%s): banned platform", entry.name, entry.ats_platform)
                 continue
             if entry.ats_platform not in SUPPORTED or not entry.slug:
                 unsupported += 1
                 continue
+            pair = (entry.ats_platform, entry.slug)
+            if pair in fetched_pairs:
+                log.info("companies: skipping %s, duplicate (%s/%s) already fetched this run",
+                          entry.name, entry.ats_platform, entry.slug)
+                continue
+            fetched_pairs.add(pair)
             try:
                 fetched = self.make(entry.ats_platform, entry.slug).fetch()
             except Exception as exc:  # noqa: BLE001 — one dead board doesn't kill the run

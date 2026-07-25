@@ -98,3 +98,41 @@ def test_harvest_ignores_known_slug(tmp_path):
     p = make_registry(tmp_path)          # REGISTRY already has greenhouse/goodco
     assert harvest_urls(p, ["https://boards.greenhouse.io/goodco/jobs/9"]) == 0
     assert len(json.loads(p.read_text())) == len(REGISTRY)
+
+
+def test_duplicate_platform_slug_entries_fetched_once(tmp_path):
+    # FINDING 3: two registry entries resolving to the same (ats, slug) must
+    # only be fetched once per run.
+    p = make_registry(tmp_path, [
+        {"name": "Dup A", "ats_platform": "greenhouse", "slug": "sameco", "enabled": True},
+        {"name": "Dup B", "ats_platform": "greenhouse", "slug": "sameco", "enabled": True},
+    ])
+    calls = []
+    def make(ats, slug):
+        calls.append((ats, slug))
+        return FakeATS([job(f"https://x.com/{slug}/1")])
+    jobs = CompaniesSource(file=p, make=make).fetch()
+    assert calls == [("greenhouse", "sameco")]
+    assert len(jobs) == 1
+
+
+def test_harvest_urls_skips_banned_platform(tmp_path):
+    # FINDING 6a: banned-platform URLs must never be written into the registry.
+    from job_pipeline.sources.companies import harvest_urls
+    p = make_registry(tmp_path, [])
+    added = harvest_urls(p, ["https://apply.workable.com/bannedco/"])
+    assert added == 0
+    assert json.loads(p.read_text()) == []
+
+
+def test_banned_platform_resolution_does_not_persist(tmp_path):
+    # FINDING 6b: when careers_url resolution lands on a banned platform, the
+    # registry file must not be rewritten (dirty flag must not be set).
+    p = make_registry(tmp_path, [
+        {"name": "Slugless Banned", "ats_platform": None, "slug": None,
+         "careers_url": "https://apply.workable.com/bannedco/", "enabled": True},
+    ])
+    before = p.read_text()
+    jobs = CompaniesSource(file=p, make=lambda ats, slug: FakeATS([])).fetch()
+    assert jobs == []
+    assert p.read_text() == before   # untouched: no rewrite
