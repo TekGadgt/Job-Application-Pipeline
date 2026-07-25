@@ -30,6 +30,18 @@ iCIMS
 - Detection Pattern: {company}.icims.com
 - API Endpoint: GET {company}.icims.com/sitemap.xml
 - Notes: Sitemap lists all job URLs with lastmod. Then scrape individual job pages for JSON-LD (JobPosting schema).
+- ⚠️ VERIFIED 2026-07-25 — the sitemap route is NOT reliable. `careers-githubinc.icims.com/sitemap.xml`
+  returns **403 "Your IP address is not on a trusted network"** (iCIMS IP-gates it per tenant), so the
+  documented method breaks at step one. The public `/jobs/search` page does return 200 but is an
+  **AngularJS SPA** (`id="ng-app"`), i.e. JS-rendered — so iCIMS realistically needs the E4 js-fallback
+  fetcher, not a tier-2 mapper. Treat tier placement above as aspirational until re-verified per tenant.
+
+Jibe / jibeapply (iCIMS career-site front end; Jibe was acquired by iCIMS)
+- Detection Pattern: {company}.jibeapply.com  (UNVERIFIED — pattern not yet confirmed against a live board)
+- Method: unknown; JS-rendered per field report. Investigate for a JSON endpoint before assuming scrape.
+- Notes: Shows up as the PUBLIC alternative when a company's own icims.com tenant is auth/IP-gated
+  (observed for GitHub). Not currently in `job_pipeline/ats_patterns.py`, so `detect()` returns None
+  for these URLs and URL-harvesting skips them.
 
 Oracle Taleo
 - Detection Pattern: {company}.taleo.net
