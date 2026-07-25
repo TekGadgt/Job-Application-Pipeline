@@ -3,6 +3,8 @@ config/profile.md
 config/pipeline.yaml
 config/companies.json
 companies.json
+config/Connections.csv
+Connections.csv
 *.seen.sqlite
 *.seen.db
 seen_index*.sqlite

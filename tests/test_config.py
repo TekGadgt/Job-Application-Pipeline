@@ -244,3 +244,16 @@ def test_save_companies_drops_non_dict_entries(tmp_path, caplog):
     assert {"no_name": True} in saved                   # dict-shaped unparseable still preserved
     assert [e for e in saved if e.get("name") == "Good"]
     assert "non-object entry" in caplog.text
+
+
+def test_company_contacts_field_defaults_null_and_round_trips(tmp_path):
+    from job_pipeline.config import CompanyEntry, load_companies, save_companies
+    p = tmp_path / "companies.json"
+    save_companies(p, [
+        CompanyEntry(name="NoContacts"),
+        CompanyEntry(name="HasContacts", contacts=["Jane Doe — Staff Engineer"]),
+    ])
+    saved = json.loads(p.read_text())
+    assert saved[0]["contacts"] is None                     # null by default
+    assert saved[1]["contacts"] == ["Jane Doe — Staff Engineer"]
+    assert load_companies(p)[1].contacts == ["Jane Doe — Staff Engineer"]

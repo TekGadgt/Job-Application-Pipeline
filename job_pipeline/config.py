@@ -104,6 +104,7 @@ class CompanyEntry(BaseModel):
     remote_policy: str | None = None
     notes: str | None = None
     source: str | None = None
+    contacts: list[str] | None = None   # people you know there, e.g. "Jane Doe — Staff Engineer"
     enabled: bool = True
 
 
