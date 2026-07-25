@@ -153,10 +153,12 @@ config line per company.
 below) and rewrites entries in place (e.g. resolving a `careers_url` to `ats_platform`
 + `slug` on first fetch), so treat it as generated data, not something you hand-edit
 under a running pipeline. It's gitignored (`config/companies.json` and bare
-`companies.json`), same as `profile.md` and `pipeline.yaml`; the repo ships
+`companies.json`), same as `config/profile.md` and `config/pipeline.yaml`; the repo ships
 `config/companies.example.json` as a publish-safe template showing the entry shape
 (`name`, `website`, `careers_url`, `ats_platform`, `slug`, `domain`, `company_size`,
-`stage`, `location`, `remote_policy`, `notes`, `source`, `enabled`).
+`stage`, `location`, `remote_policy`, `notes`, `source`, `contacts`, `enabled`).
+`contacts` is an optional list of people you know there (e.g.
+`["Jane Doe — Staff Engineer"]`), null by default.
 
 Enable it with one source line:
 
@@ -166,7 +168,8 @@ sources:
 ```
 
 **`notes` feeds the score agent.** Whatever you put in an entry's `notes` field (e.g.
-from a research pass — see `docs/CompanyResearchPrompt.md`) is attached to every job
+from a research pass — the prompt driving one is user-specific and gitignored, so write
+your own) is attached to every job
 fetched from that company as `Job.company_context`, and the score stage prepends it to
 its prompt as `COMPANY CONTEXT: <notes>` — so "why this company fits" reasoning you did
 once, up front, informs every scoring pass for that company's postings.

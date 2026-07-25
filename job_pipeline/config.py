@@ -116,7 +116,7 @@ def load_companies(path: Path | str) -> list[CompanyEntry]:
         return []
     try:
         raw_list = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError) as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
         log.warning("companies registry %s is invalid/unreadable: %s", path, exc)
         return []
     if not isinstance(raw_list, list):

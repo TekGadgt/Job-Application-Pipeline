@@ -257,3 +257,13 @@ def test_company_contacts_field_defaults_null_and_round_trips(tmp_path):
     assert saved[0]["contacts"] is None                     # null by default
     assert saved[1]["contacts"] == ["Jane Doe — Staff Engineer"]
     assert load_companies(p)[1].contacts == ["Jane Doe — Staff Engineer"]
+
+
+def test_load_companies_binary_file_warns_empty(tmp_path, caplog):
+    import logging
+    from job_pipeline.config import load_companies
+    caplog.set_level(logging.WARNING, logger="job_pipeline")
+    p = tmp_path / "companies.json"
+    p.write_bytes(b"\xff\xfe\x00not utf-8 at all")
+    assert load_companies(p) == []          # must not raise UnicodeDecodeError
+    assert "invalid/unreadable" in caplog.text
