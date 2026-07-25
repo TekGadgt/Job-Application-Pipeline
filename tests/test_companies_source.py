@@ -136,3 +136,27 @@ def test_banned_platform_resolution_does_not_persist(tmp_path):
     jobs = CompaniesSource(file=p, make=lambda ats, slug: FakeATS([])).fetch()
     assert jobs == []
     assert p.read_text() == before   # untouched: no rewrite
+
+
+def test_banned_platform_resolution_does_not_persist_when_other_entry_is_dirty(tmp_path):
+    # FINDING 6b (multi-entry): the prior fix suppressed `dirty` for the banned
+    # entry but still mutated it in memory. If ANY other entry in the same run
+    # sets dirty (e.g. a legitimate slugless -> greenhouse resolution), the
+    # whole entries list is written out, including the banned entry's
+    # in-memory-mutated ats_platform/slug. The banned entry must never be
+    # persisted with a resolved platform/slug, regardless of what else in the
+    # registry triggers a save this run.
+    p = make_registry(tmp_path, [
+        {"name": "Slugless Banned", "ats_platform": None, "slug": None,
+         "careers_url": "https://apply.workable.com/bannedco/", "enabled": True},
+        {"name": "Slugless Good", "ats_platform": None, "slug": None,
+         "careers_url": "https://boards.greenhouse.io/goodco/jobs/1", "enabled": True},
+    ])
+    jobs = CompaniesSource(file=p, make=lambda ats, slug: FakeATS([])).fetch()
+    assert jobs == []
+    saved = json.loads(p.read_text())
+    banned = next(e for e in saved if e["name"] == "Slugless Banned")
+    assert banned["ats_platform"] is None
+    assert banned["slug"] is None
+    good = next(e for e in saved if e["name"] == "Slugless Good")
+    assert good["ats_platform"] == "greenhouse" and good["slug"] == "goodco"

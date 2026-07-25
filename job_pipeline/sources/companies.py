@@ -66,11 +66,16 @@ class CompaniesSource:
                 continue
             if entry.slug is None and entry.careers_url:
                 hit = detect(entry.careers_url)
+                if hit and hit[0] in BANNED:
+                    # Don't mutate or persist a banned-platform resolution
+                    # (FINDING 6b): refuse before touching the entry so a
+                    # later save() triggered by some *other* dirty entry in
+                    # this run can never carry this resolution to disk.
+                    log.warning("refusing %s (%s): banned platform", entry.name, hit[0])
+                    continue
                 if hit:
                     entry.ats_platform, entry.slug = hit
-                    # Don't persist a banned-platform resolution (FINDING 6b):
-                    # let the BANNED check below log+skip it every run instead.
-                    dirty = dirty or hit[0] not in BANNED
+                    dirty = True
             if entry.ats_platform in BANNED:
                 log.warning("refusing %s (%s): banned platform", entry.name, entry.ats_platform)
                 continue

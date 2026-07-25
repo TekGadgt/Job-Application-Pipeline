@@ -175,9 +175,11 @@ once, up front, informs every scoring pass for that company's postings.
 `companies` source is configured, any manual URL processed this run (`--url`, or an
 inbox line) whose domain matches a known ATS pattern (`docs/JobBoardDetection.md`) is
 auto-appended to the registry as a new entry (`source: url_harvest`, `enabled: true`,
-name defaulted to the URL's slug) — already-known `(platform, slug)` pairs are skipped.
-The harvested entry isn't fetched during the run that discovered it; it's picked up
-starting the *next* run, same as any other registry entry.
+name defaulted to the URL's slug) — already-known `(platform, slug)` pairs are skipped,
+and so are matches on a banned platform (Workable — see below), which are never
+written to the registry. The harvested entry isn't fetched during the run that
+discovered it; it's picked up starting the *next* run, same as any other registry
+entry.
 
 **Wave activation.** Set `enabled: false` on entries you're not ready to fetch yet
 (e.g. a large research batch you want to phase in) — disabled entries are loaded but

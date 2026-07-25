@@ -142,11 +142,13 @@ def save_companies(path: Path | str, entries: list[CompanyEntry]) -> None:
     unparsed: list[dict] = []
     if path.exists():
         try:
-            for raw in json.loads(path.read_text()):
-                try:
-                    CompanyEntry(**raw)
-                except Exception:  # noqa: BLE001 — unparseable: preserve verbatim
-                    unparsed.append(raw)
+            raw_list = json.loads(path.read_text())
+            if isinstance(raw_list, list):
+                for raw in raw_list:
+                    try:
+                        CompanyEntry(**raw)
+                    except Exception:  # noqa: BLE001 — unparseable: preserve verbatim
+                        unparsed.append(raw)
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             pass   # unreadable file: nothing to preserve
     payload = [e.model_dump(exclude_none=False) for e in entries] + unparsed

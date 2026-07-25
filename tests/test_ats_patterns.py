@@ -63,6 +63,20 @@ def test_detect_greenhouse_embed_without_for_param_is_none():
     assert detect("https://boards.greenhouse.io/embed/job_app?token=1") is None
 
 
+def test_detect_greenhouse_embed_for_param_is_url_decoded():
+    # FINDING 3: for= is a raw query-string value and may be percent-encoded.
+    assert detect(
+        "https://boards.greenhouse.io/embed/job_app?token=1&for=Acme%20Inc"
+    ) == ("greenhouse", "Acme Inc")
+
+
+def test_detect_greenhouse_embed_for_param_is_case_insensitive():
+    # FINDING 3: query param names are conventionally case-insensitive.
+    assert detect(
+        "https://boards.greenhouse.io/embed/job_app?token=1&FOR=acme"
+    ) == ("greenhouse", "acme")
+
+
 def test_detect_eightfold_is_path_qualified():
     # FINDING 4: eightfold must require /careers, like oraclecloud/bamboohr.
     assert detect("https://exampleco.eightfold.ai/careers") == ("eightfold", "exampleco")

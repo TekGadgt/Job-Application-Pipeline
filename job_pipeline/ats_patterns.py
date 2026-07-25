@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import parse_qsl, urlsplit
 
 PATTERNS: list[tuple[str, re.Pattern]] = [
     ("greenhouse", re.compile(r"(?<![\w-])(?:boards|job-boards)\.greenhouse\.io/(?P<slug>[^/?#]+)")),
@@ -40,8 +41,11 @@ def _greenhouse_company_slug(url: str, slug: str) -> str | None:
     """
     if slug.lower() not in GREENHOUSE_RESERVED_SLUGS:
         return slug
-    m = re.search(r"[?&]for=([^&#]+)", url)
-    return m.group(1) if m else None
+    query = urlsplit(url).query
+    for key, value in parse_qsl(query, keep_blank_values=True):
+        if key.lower() == "for" and value:
+            return value
+    return None
 
 
 def detect(url: str) -> tuple[str, str] | None:

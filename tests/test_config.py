@@ -206,3 +206,26 @@ def test_load_save_round_trip_preserves_extra_keys_and_unparsable_entries(tmp_pa
     assert good["priority"] == 1                      # extra key round-tripped
     invalid = next(e for e in saved if e.get("no_name") is True)
     assert invalid == {"no_name": True}                # unparsable entry preserved verbatim
+
+
+def test_save_companies_ignores_non_list_existing_file(tmp_path):
+    """FINDING 2: the preservation re-read must guard non-list registry files.
+
+    load_companies() already refuses (with a warning) to treat a dict-shaped
+    file as a registry. save_companies()'s re-read-to-preserve-unparsable-
+    entries loop must apply the same guard: without it, iterating a dict
+    walks its *keys* and writes bare strings into `unparsed`, violating the
+    `unparsed: list[dict]` contract and corrupting the output file.
+    """
+    from job_pipeline.config import CompanyEntry, save_companies
+
+    p = tmp_path / "companies.json"
+    p.write_text(json.dumps({"name": "not a list", "other": "also not a list"}))
+
+    save_companies(p, [CompanyEntry(name="A", ats_platform="lever", slug="a")])
+
+    saved = json.loads(p.read_text())
+    assert saved == [
+        CompanyEntry(name="A", ats_platform="lever", slug="a").model_dump(exclude_none=False)
+    ]
+    assert all(isinstance(e, dict) for e in saved)   # no bare strings from dict keys
