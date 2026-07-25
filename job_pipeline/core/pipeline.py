@@ -20,6 +20,7 @@ import job_pipeline.stages.agents     # noqa: F401
 import job_pipeline.stages.publish    # noqa: F401
 import job_pipeline.sources.manual    # noqa: F401
 import job_pipeline.sources.feeds     # noqa: F401
+import job_pipeline.sources.companies  # noqa: F401
 import job_pipeline.seeders.existing_vault  # noqa: F401
 
 log = logging.getLogger("job_pipeline")

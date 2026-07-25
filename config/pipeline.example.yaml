@@ -3,6 +3,7 @@ sources:
   - {type: lever, org: examplecompany}
   - {type: rss, url: "https://example.com/jobs.rss"}
   - {type: manual, inbox: ~/vault/jobs/inbox.txt}   # one URL per line; consumed on run
+  # - {type: companies, file: companies.json}   # machine-owned registry (see README)
   # Loosely formatted feed — HN "Who is hiring?" (uncomment to enable):
   # - type: rss
   #   url: "https://hnrss.org/whoishiring/jobs"
