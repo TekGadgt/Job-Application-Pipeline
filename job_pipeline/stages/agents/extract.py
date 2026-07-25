@@ -29,7 +29,7 @@ class ExtractReply(BaseModel):
     employer_email: str = ""
 
 
-EXTRACT_PROMPT = """{source_context}Extract structured fields from this job listing. Reply with ONLY a JSON object:
+EXTRACT_PROMPT = """{source_context}{known_fields}Extract structured fields from this job listing. Reply with ONLY a JSON object:
 {"title": str, "company": str, "location": str, "comp_text": str,
  "comp_min": int|null, "comp_max": int|null, "comp_currency": str|null,
  "comp_period": "annual"|"hourly"|null, "requirements": [str], "description": str,
@@ -39,6 +39,10 @@ description is a 2-3 sentence summary.
 
 LISTING:
 {raw_text}"""
+
+
+def _is_blank(value) -> bool:
+    return value in ("", None) or value == []
 
 
 @register_stage("extract")
@@ -52,14 +56,25 @@ class ExtractStage:
         self.runner, self.model = runner, model
 
     def run(self, job: Job) -> Job:
+        blanks = [f for f in ExtractReply.model_fields if _is_blank(getattr(job, f))]
+        if not blanks:
+            job.add_trace("extract", "skipped: all fields prefilled")
+            return job
+        known = {f: getattr(job, f) for f in ExtractReply.model_fields
+                 if not _is_blank(getattr(job, f))}
+        known_fields = (
+            f"ALREADY KNOWN (authoritative, do not contradict): {known}\n\n" if known else ""
+        )
         source_context = (
             f"SOURCE CONTEXT: {job.extract_hint}\n\n" if job.extract_hint else ""
         )
         reply = self.runner.run(
-            _fill(EXTRACT_PROMPT, source_context=source_context, raw_text=job.raw_text),
+            _fill(EXTRACT_PROMPT, source_context=source_context,
+                  known_fields=known_fields, raw_text=job.raw_text),
             self.model, ExtractReply,
         )
         for field_name, value in reply.model_dump().items():
-            setattr(job, field_name, value)
-        job.add_trace("extract", "extracted")
+            if field_name in blanks:
+                setattr(job, field_name, value)
+        job.add_trace("extract", f"extracted ({len(blanks)} fields; {len(known)} prefilled)")
         return job

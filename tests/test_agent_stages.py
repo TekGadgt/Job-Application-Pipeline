@@ -85,3 +85,39 @@ def test_extract_omits_source_context_when_no_hint():
     prompt = r.calls[0][0]
     assert "SOURCE CONTEXT" not in prompt
     assert prompt.startswith("Extract structured fields from this job listing.")
+
+
+def test_extract_gap_fills_not_clobbers():
+    # Prefilled title/location (as a structured source would provide) must
+    # survive a MockRunner reply that contradicts them; blank fields take
+    # the reply's values.
+    r = MockRunner([EXTRACT_REPLY])
+    j = ExtractStage(r, "haiku").run(
+        make_job(title="Staff Engineer", location="Austin, TX")
+    )
+    assert j.title == "Staff Engineer"
+    assert j.location == "Austin, TX"
+    assert j.description == "Build things."
+    assert j.requirements == ["python"]
+    assert j.comp_min == 150000 and j.comp_max == 180000
+    assert not j.rejected
+
+
+def test_extract_skips_runner_when_nothing_blank():
+    # Every ExtractReply field is prefilled, so the runner must not be
+    # called at all -- MockRunner([]) would raise RunnerError if it were.
+    r = MockRunner([])
+    j = ExtractStage(r, "haiku").run(
+        make_job(
+            title="Staff Engineer", company="Acme", location="Austin, TX",
+            comp_text="$200k", comp_min=200000, comp_max=220000,
+            comp_currency="USD", comp_period="annual",
+            requirements=["rust"], description="Already extracted.",
+            employer_address="123 Main St", employer_phone="555-1234",
+            employer_email="hr@acme.com",
+        )
+    )
+    assert r.calls == []
+    assert j.title == "Staff Engineer"
+    assert j.description == "Already extracted."
+    assert any("skipped" in verdict for _, verdict, _ in j.trace)
