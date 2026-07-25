@@ -5,6 +5,7 @@ config/companies.json
 companies.json
 config/Connections.csv
 Connections.csv
+config/e1b-*.json
 *.seen.sqlite
 *.seen.db
 seen_index*.sqlite
