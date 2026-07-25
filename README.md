@@ -140,6 +140,62 @@ To write your own, copy the closest existing one as a template
 `@register_stage("your_name")`, and add the name to `stages:` in
 `config/pipeline.yaml`.
 
+#### Company registry
+
+For companies you've deliberately identified as good fits — e.g. via a research pass
+over target lists — the `companies` source (`job_pipeline/sources/companies.py`) reads
+a JSON registry and expands each enabled entry into a per-ATS fetch, the same way
+`- {type: greenhouse, board: ...}` would, but with one entry per company instead of one
+config line per company.
+
+**Ownership split:** `config/pipeline.yaml` is human-owned — you write and edit it.
+`config/companies.json` is machine-owned: the pipeline appends to it (URL harvesting,
+below) and rewrites entries in place (e.g. resolving a `careers_url` to `ats_platform`
++ `slug` on first fetch), so treat it as generated data, not something you hand-edit
+under a running pipeline. It's gitignored (`config/companies.json` and bare
+`companies.json`), same as `profile.md` and `pipeline.yaml`; the repo ships
+`config/companies.example.json` as a publish-safe template showing the entry shape
+(`name`, `website`, `careers_url`, `ats_platform`, `slug`, `domain`, `company_size`,
+`stage`, `location`, `remote_policy`, `notes`, `source`, `enabled`).
+
+Enable it with one source line:
+
+```yaml
+sources:
+  - {type: companies, file: companies.json}
+```
+
+**`notes` feeds the score agent.** Whatever you put in an entry's `notes` field (e.g.
+from a research pass — see `docs/CompanyResearchPrompt.md`) is attached to every job
+fetched from that company as `Job.company_context`, and the score stage prepends it to
+its prompt as `COMPANY CONTEXT: <notes>` — so "why this company fits" reasoning you did
+once, up front, informs every scoring pass for that company's postings.
+
+**URL harvesting.** Registering a company by hand isn't the only way in: when a
+`companies` source is configured, any manual URL processed this run (`--url`, or an
+inbox line) whose domain matches a known ATS pattern (`docs/JobBoardDetection.md`) is
+auto-appended to the registry as a new entry (`source: url_harvest`, `enabled: true`,
+name defaulted to the URL's slug) — already-known `(platform, slug)` pairs are skipped.
+The harvested entry isn't fetched during the run that discovered it; it's picked up
+starting the *next* run, same as any other registry entry.
+
+**Wave activation.** Set `enabled: false` on entries you're not ready to fetch yet
+(e.g. a large research batch you want to phase in) — disabled entries are loaded but
+skipped, so you can flip companies on in waves by editing `companies.json` without
+touching `pipeline.yaml` or code.
+
+**Workable is refused outright.** `apply.workable.com` boards are known to
+aggressively IP-ban scrapers, so entries with `ats_platform: workable` are logged and
+skipped unconditionally, regardless of `enabled` — there's no supported way to fetch
+them yet.
+
+**Unsupported platforms are counted, not fetched.** `detect()` recognizes more ATS
+platforms (Ashby, SmartRecruiters, Workday, iCIMS, ...) than the pipeline has fetchers
+for today. Entries whose `ats_platform` isn't in the currently-supported set
+(`greenhouse`, `lever`) are counted and logged (`N entries await unsupported-platform
+mappers`) but not fetched — they'll start flowing once their mappers land in a future
+batch (tracked as E3/E4), with no registry changes required on your part.
+
 ### 3. Personal data outside the repo
 
 Your real `config/profile.md`, `config/pipeline.yaml`, vault path, and seen-index are gitignored. The repo ships `*.example` templates — publish-safe from day one.

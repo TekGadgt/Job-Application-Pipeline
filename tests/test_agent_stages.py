@@ -46,6 +46,20 @@ def test_score_sets_score_and_rationale():
     assert r.calls[0][1] == "opus"
 
 
+def test_score_includes_company_context_when_present():
+    p = Profile(body="prefs")
+    r = MockRunner([{"score": 87.0, "rationale": "Strong match"}])
+    ScoreStage(r, "opus", p).run(make_job(company_context="great fit"))
+    assert "COMPANY CONTEXT: great fit" in r.calls[0][0]
+
+
+def test_score_omits_company_context_marker_when_absent():
+    p = Profile(body="prefs")
+    r = MockRunner([{"score": 87.0, "rationale": "Strong match"}])
+    ScoreStage(r, "opus", p).run(make_job())      # company_context defaults to ""
+    assert "COMPANY CONTEXT" not in r.calls[0][0]
+
+
 def test_extract_tolerates_braces_in_raw_text():
     r = MockRunner([EXTRACT_REPLY])
     j = ExtractStage(r, "haiku").run(

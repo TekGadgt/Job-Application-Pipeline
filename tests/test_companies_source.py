@@ -75,3 +75,26 @@ def test_per_entry_failure_is_isolated(tmp_path):
 
 def test_missing_registry_yields_no_jobs(tmp_path):
     assert CompaniesSource(file=tmp_path / "nope.json").fetch() == []
+
+
+def test_harvest_appends_new_entry_once(tmp_path):
+    from job_pipeline.sources.companies import harvest_urls
+    p = make_registry(tmp_path, [])
+    added = harvest_urls(p, [
+        "https://boards.greenhouse.io/newco/jobs/1",
+        "https://boards.greenhouse.io/newco/jobs/2",     # same slug: once
+        "https://example.com/careers",                    # no match: ignored
+    ])
+    assert added == 1
+    saved = json.loads(p.read_text())
+    assert len(saved) == 1
+    e = saved[0]
+    assert e["name"] == "newco" and e["ats_platform"] == "greenhouse"
+    assert e["slug"] == "newco" and e["source"] == "url_harvest" and e["enabled"] is True
+
+
+def test_harvest_ignores_known_slug(tmp_path):
+    from job_pipeline.sources.companies import harvest_urls
+    p = make_registry(tmp_path)          # REGISTRY already has greenhouse/goodco
+    assert harvest_urls(p, ["https://boards.greenhouse.io/goodco/jobs/9"]) == 0
+    assert len(json.loads(p.read_text())) == len(REGISTRY)

@@ -99,6 +99,14 @@ def run_pipeline(cfg: PipelineConfig, profile: Profile, runner: AgentRunner,
             origin[j.id] = src
             jobs.append(j)
 
+    registry_file = next(
+        (s.get("file") for s in cfg.sources if s.get("type") == "companies"), None)
+    if registry_file:
+        manual_urls = [j.url for j in jobs if j.source == "manual"]
+        if manual_urls:
+            from job_pipeline.sources.companies import harvest_urls
+            harvest_urls(registry_file, manual_urls)
+
     stages = build_stages(cfg, profile, seen, runner, writer, force)
     result = DeterministicOrchestrator(cfg.limits.max_agent_jobs_per_run).run(jobs, stages)
 

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from job_pipeline.ats_patterns import detect
-from job_pipeline.config import load_companies, save_companies
+from job_pipeline.config import CompanyEntry, load_companies, save_companies
 from job_pipeline.core.job import Job
 from job_pipeline.core.registry import get_source, register_source
 
@@ -23,6 +23,26 @@ def _default_make(ats: str, slug: str):
 
 
 SUPPORTED = {"greenhouse", "lever"}   # E3 extends: ashby, smartrecruiters, ...
+
+
+def harvest_urls(registry_path: Path | str, urls: list[str]) -> int:
+    """Append registry entries for manual URLs matching known ATS patterns."""
+    entries = load_companies(registry_path)
+    known = {(e.ats_platform, e.slug) for e in entries}
+    added = 0
+    for url in urls:
+        hit = detect(url)
+        if not hit or hit in known:
+            continue
+        ats, slug = hit
+        entries.append(CompanyEntry(name=slug, ats_platform=ats, slug=slug,
+                                    source="url_harvest", enabled=True))
+        known.add(hit)
+        added += 1
+        log.info("harvested %s as %s source (from %s)", slug, ats, url)
+    if added:
+        save_companies(registry_path, entries)
+    return added
 
 
 @register_source("companies")
