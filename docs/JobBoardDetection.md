@@ -30,6 +30,11 @@ iCIMS
 - Detection Pattern: {company}.icims.com
 - API Endpoint: GET {company}.icims.com/sitemap.xml
 - Notes: Sitemap lists all job URLs with lastmod. Then scrape individual job pages for JSON-LD (JobPosting schema).
+- ⚠️ VERIFIED 2026-07-25 — job DETAIL pages are reachable (200); only discovery is blocked.
+  `careers-githubinc.icims.com/jobs/5623/.../job` returns 200 but is a **true JS shell**: no JSON-LD,
+  visible-text ratio 0.0036, and the only readable text is the company's nav chrome. So an iCIMS detail
+  page needs a browser — UNLESS the company also has a jibeapply mirror (see below), which serves the
+  same job as parseable JSON-LD.
 - ⚠️ VERIFIED 2026-07-25 — the sitemap route is NOT reliable. `careers-githubinc.icims.com/sitemap.xml`
   returns **403 "Your IP address is not on a trusted network"** (iCIMS IP-gates it per tenant), so the
   documented method breaks at step one. The public `/jobs/search` page does return 200 but is an
@@ -50,6 +55,12 @@ Jibe / jibeapply (iCIMS career-site front end; Jibe was acquired by iCIMS)
   launch Playwright unnecessarily. The JSON-LD description alone is 7,136 chars (~1.8k tokens).
   See `docs/superpowers/specs/2026-07-25-jsonld-jobposting-design.md` — JSON-LD parsing must run
   BEFORE the shell heuristic.
+- **ROUTING RULE (verified on GitHub, n=1 — confirm before generalizing):** the jibeapply mirror uses the
+  SAME numeric job id as the icims tenant. `careers-githubinc.icims.com/jobs/5623/...` and
+  `githubinc.jibeapply.com/jobs/5623` are the same posting; the icims one is an unparseable JS shell and
+  the jibeapply one carries full JSON-LD. So: given an iCIMS job URL, try rewriting to
+  `{slug}.jibeapply.com/jobs/{id}` and prefer that — free and deterministic instead of launching a browser.
+  Subdomain differs (`careers-githubinc` vs `githubinc`), so the slug transform is NOT yet established.
 - Notes: Shows up as the PUBLIC alternative when a company's own icims.com tenant is auth/IP-gated
   (observed for GitHub). Not currently in `job_pipeline/ats_patterns.py`, so `detect()` returns None
   for these URLs and URL-harvesting skips them.
