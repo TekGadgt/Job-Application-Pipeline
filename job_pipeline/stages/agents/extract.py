@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from job_pipeline.core.job import Job
 from job_pipeline.core.registry import register_stage
-from job_pipeline.core.runner import AgentRunner
+from job_pipeline.core.runner import ModelChain
 from job_pipeline.core.stage import StageSpec
 from job_pipeline.stages.agents.common import _fill
 
@@ -52,8 +52,8 @@ class ExtractStage:
                      produces=["title", "company", "location", "comp_min", "comp_max"],
                      kind="agent", cost_tier="cheap")
 
-    def __init__(self, runner: AgentRunner, model: str) -> None:
-        self.runner, self.model = runner, model
+    def __init__(self, chain: ModelChain) -> None:
+        self.chain = chain
 
     def run(self, job: Job) -> Job:
         blanks = [f for f in ExtractReply.model_fields if _is_blank(getattr(job, f))]
@@ -68,10 +68,10 @@ class ExtractStage:
         source_context = (
             f"SOURCE CONTEXT: {job.extract_hint}\n\n" if job.extract_hint else ""
         )
-        reply = self.runner.run(
+        reply = self.chain.run(
             _fill(EXTRACT_PROMPT, source_context=source_context,
                   known_fields=known_fields, raw_text=job.raw_text),
-            self.model, ExtractReply,
+            ExtractReply,
         )
         for field_name, value in reply.model_dump().items():
             if field_name in blanks:

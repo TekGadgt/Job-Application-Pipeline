@@ -38,7 +38,7 @@ def _run(monkeypatch, tmp_path, extra_args):
 
     monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
     rc = cli.main(["run", "--config", str(cfg), "--profile", str(prof),
-                   "--mock", *extra_args])
+                   *extra_args])
     assert rc == 0
     return captured
 
@@ -89,7 +89,7 @@ def test_reprocess_clears_seen_row_before_run(monkeypatch, tmp_path):
 
     monkeypatch.setattr(cli, "run_pipeline", fake_run_pipeline)
     rc = cli.main(["run", "--config", str(cfg), "--profile", str(prof),
-                   "--mock", "--url", url, "--reprocess"])
+                   "--url", url, "--reprocess"])
     assert rc == 0
     assert not SeenIndex(vault / ".job_pipeline.seen.sqlite").has_url(h)
 

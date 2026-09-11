@@ -63,9 +63,42 @@ def test_load_pipeline_config(tmp_path):
     p.write_text(PIPELINE)
     cfg = load_pipeline_config(p)
     assert cfg.stages == ["dedup", "hard_filter"]
-    assert cfg.models["score"] == "opus"
+    assert cfg.models["score"][0].provider == "anthropic"
+    assert cfg.models["score"][0].model == "opus"
     assert cfg.limits.max_agent_jobs_per_run == 40
     assert not hasattr(cfg.output, "keep_rejects")   # retired dead config
+
+
+def test_model_chains_parse_provider_model_entries(tmp_path):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(PIPELINE.replace(
+        "models: {extract: haiku, skill_gap: sonnet, score: opus}",
+        "models:\n"
+        "  extract: [custom:gpt-5.6-luna, openai:gpt-5.6-luna, anthropic:haiku]\n"
+        "  skill_gap: [anthropic:sonnet]\n"
+        "  score: [openai:gpt-5.6-terra, claude:opus]\n"
+        "runners: {openai: {max_attempts: 2}}",
+    ))
+    cfg = load_pipeline_config(p)
+    assert [(r.provider, r.model) for r in cfg.models["extract"]] == [
+        ("custom", "gpt-5.6-luna"),
+        ("openai", "gpt-5.6-luna"),
+        ("anthropic", "haiku"),
+    ]
+    assert cfg.models["score"][1].provider == "claude"
+    assert cfg.runners["openai"]["max_attempts"] == 2
+
+
+@pytest.mark.parametrize("bad", ["[]", "''", "':model'", "'provider:'"])
+def test_model_chains_reject_malformed_entries(tmp_path, bad):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text(
+        "stages: [extract]\n"
+        f"models: {{extract: {bad}}}\n"
+        "output: {vault: /tmp/vault}\n"
+    )
+    with pytest.raises(ValidationError, match="extract"):
+        load_pipeline_config(p)
 
 
 def test_pipeline_config_rejects_negative_cap(tmp_path):

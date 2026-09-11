@@ -4,16 +4,24 @@ Re-cut 2026-07-23 after a usage review: the pipeline was over-filtering (see `20
 
 Execution order: **L → B → E → F → VEC** (lean the core, land vault value, expand intake, then observability to handle the volume, enrichment last).
 
-## Batch L — Lean core *(unblocked — next up)*
+Current working state (2026-09-11): a multi-provider runner migration
+is preserved on `review/current-state-provider-migration`. It revives the shelved
+Batch D work; it is not merged. Active and example chains now use Codex with Claude
+fallbacks; OpenCode Go was removed from those configs after subscription cancellation.
+The OpenCode adapter has been removed. Provider startup is lazy and supports
+fallback on unavailable CLI/authentication; `--mock` is an isolated offline preview.
+Live-provider integration remains unverified.
+
+## Batch L — Lean core *(merged — PR #4)*
 - `2026-07-23-lean-core` — delete location/salary gates, `dedup_fuzzy` record-only (URL is the only hard dedup), dead profile config removed (`locations`, `salary_floor`, `salary_not_listed`, `must_have_skills`, `nice_to_have`, `keep_rejects`). `hard_filter` and optional `score_floor` explicitly retained.
 
-## Batch B — Vault output *(blocked by L)*
+## Batch B — Vault output *(merged — PR #5)*
 Everything that lands in notes; one golden-test rebase for all three, plus the new surfacing keys.
 - `2026-07-03-comp-in-notes` — comp frontmatter keys + `## Compensation` section; **rebase adds `location` frontmatter key and `possible_duplicate`/fuzzy-key surfacing** (data the lean core keeps but publish currently drops).
 - `2026-07-03-application-status` — user-owned field; extends `is_user_touched`
 - `2026-07-03-vault-import` — `job-pipeline import`, `fields:` map, `keep_unmapped` (needs application-status; satisfied in-batch)
 
-## Batch E — Intake expansion *(blocked by B — in progress, executed in waves)*
+## Batch E — Intake expansion *(in progress, executed in waves)*
 APIs everywhere possible; scrape only as fallback. Pull the minimal fetcher seam from shelved Batch C as needed.
 Too big for one plan — each wave is its own plan/branch/PR (or an operational run with no PR):
 - **E1 — Research seed** *(operational, DONE 2026-07-25)*: ran `docs/CompanyResearchPrompt.md` via multi-agent workflow (10 researchers → dedup → 17 verifiers → synthesis). Result: **124 companies** in `config/companies.json`, 115 with live careers URLs, **25 enabled for wave 1**. ATS histogram: ashby 37, greenhouse 37, unknown 39, lever 7, workable 4 (never fetched), workday 1, bamboohr 1. Of wave 1, **13 are fetchable today** (greenhouse/lever mappers exist) and **12 await the E3 ashby mapper**. Lesson for re-runs: run `detect()` over the checkpoint locally first — it resolves ATS/slug for free; only marketing-page entries need agents.
@@ -21,7 +29,7 @@ Too big for one plan — each wave is its own plan/branch/PR (or an operational 
   - **E1b — LinkedIn follow-up batch** *(export received 2026-07-25; filtering DONE, board-resolution NOT started)*: `config/Connections.csv` (gitignored) → 354 connections / 252 companies. Filter applied = `CompanyResearchPrompt.md`'s avoid-list (agencies/consultancies 8, defense/military 6, crypto 0, surveillance 0) + Ryan's former employers (Trader Interactive, TechArk, MAXX Potential) + non-companies ("Freelance" etc.) + already-in-registry → **225 candidates**, saved to `config/e1b-network-candidates.json` (gitignored). Universities are NOT excluded (ODU is a valid target depending on roles).
     - **Key finding:** of the **14 companies with ≥2 connections** (`config/e1b-network-multi.json`), **7 are Hampton Roads/Virginia employers** — InMotion Hosting (VB, 8 connections), PRA Group (Norfolk), Dollar Tree (Chesapeake), Sentara Health (Norfolk), ODU (Norfolk), Hamilton Beach + CoStar (Richmond). Batch 1's channels (YC/HN/remote lists) structurally cannot surface established regional employers, so the network fills exactly the regional gap noted below. Network/registry overlap is only 5/124 — E1b is additive, not redundant.
     - **Next steps:** (1) resolve boards for the 14 multi-connection companies (~3 haiku agents; a run was started and cancelled for session limits); (2) the 210 single-connection candidates are weak signal (one-person LLCs, a conference, small studios) — triage by NAME ONLY with 1-2 cheap agents before spending any fetch budget on them. Registry entries get `source: "linkedin_export"` and populate the `contacts` field.
-- **E2 — Registry infrastructure** *(plan/PR)*: the `2026-07-24-company-registry-discovery` spec's code — registry loader + example file, `type: companies` meta-source, gap-fill extract, URL harvesting, score context, wave gating.
+- **E2 — Registry infrastructure** *(merged — PR #6)*: the `2026-07-24-company-registry-discovery` spec's code — registry loader + example file, `type: companies` meta-source, gap-fill extract, URL harvesting, score context, wave gating.
 - **E3 — Mappers by demand** *(plan/PR; histogram now in — ASHBY IS THE PRIORITY)*: `2026-07-16-ashby-source` first — ashby ties greenhouse as the most common platform (37 each) and blocks 12 of the 25 wave-1 companies. SmartRecruiters/Workday scored 0 and 1 respectively in this batch, so both are deferred until a later research batch justifies them. Non-standard vendors seen (Rippling ×3, Personio, Dover, join.com, Jobylon, JazzHR, Welcome to the Jungle, Notion) are E4 scrape candidates, not mappers.
 - **E4 — Scrape fallback** *(plan/PR)*: `2026-07-25-jsonld-jobposting` **first** (free, deterministic, and it decides how often the browser is even needed), then `2026-07-02-scrape-source` + `2026-07-03-js-fallback-fetcher` for the unknown-platform tail. JSON-LD verified to carry the real employer + full description on GitHub's jibeapply board, where raw HTML is ~144k tokens vs ~1.8k for the JSON-LD description; without it, `looks_js_shell` would launch Playwright on pages whose content is already in the HTML.
 - **E5 — Activation** *(operational)*: enable registry waves, watch the FIFO drain — hands off to Batch F.

@@ -27,6 +27,28 @@ class Limits(BaseModel):
     max_agent_jobs_per_run: int = Field(default=40, gt=0)
 
 
+class ModelRef(BaseModel):
+    """A provider/model pair used as one entry in a fallback chain."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    model: str
+
+    @classmethod
+    def parse(cls, value: str) -> "ModelRef":
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("model reference must be a non-empty string")
+        value = value.strip()
+        if ":" in value:
+            provider, model = value.split(":", 1)
+        else:
+            provider, model = "anthropic", value
+        if not provider.strip() or not model.strip():
+            raise ValueError(f"invalid model reference {value!r}")
+        return cls(provider=provider.strip(), model=model.strip())
+
+
 CANONICAL_IMPORT_KEYS = frozenset({
     "company", "position", "location", "type_of_work", "source_url",
     "date_found", "date_of_contact", "employer_address", "employer_phone",
@@ -53,7 +75,8 @@ class PipelineConfig(BaseModel):
     sources: list[dict] = []
     seeders: list[dict] = []
     stages: list[str]
-    models: dict[str, str] = {}
+    models: dict[str, list[ModelRef]] = {}
+    runners: dict[str, dict] = {}
     output: OutputConfig
     limits: Limits = Limits()
     import_: ImportConfig | None = Field(default=None, alias="import")
@@ -66,7 +89,28 @@ class PipelineConfig(BaseModel):
 
     @field_validator("models", mode="before")
     @classmethod
-    def _none_as_empty_dict(cls, v: object) -> object:
+    def _normalize_model_chains(cls, v: object) -> object:
+        if v is None:
+            return {}
+        if not isinstance(v, dict):
+            return v
+        normalized: dict[str, list[ModelRef]] = {}
+        for stage, raw_chain in v.items():
+            chain = raw_chain if isinstance(raw_chain, list) else [raw_chain]
+            if not chain:
+                raise ValueError(f"models.{stage}: fallback chain must not be empty")
+            try:
+                normalized[str(stage)] = [
+                    item if isinstance(item, ModelRef) else ModelRef.parse(item)
+                    for item in chain
+                ]
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"models.{stage}: {exc}") from exc
+        return normalized
+
+    @field_validator("runners", mode="before")
+    @classmethod
+    def _none_as_empty_runners(cls, v: object) -> object:
         return {} if v is None else v
 
 

@@ -17,7 +17,13 @@ seeders:
   - {type: existing_vault, path: ~/vault/jobs, url_field: source_url}
 # optional stage: add score_floor between score and publish (set score_floor in profile.md)
 stages: [dedup, hard_filter, extract, dedup_fuzzy, skill_gap, score, publish]
-models: {extract: haiku, skill_gap: sonnet, score: opus}
+models:
+  extract: [openai:gpt-5.6-luna, anthropic:haiku]
+  skill_gap: [openai:gpt-5.6-luna, anthropic:sonnet]
+  score: [openai:gpt-5.6-terra, anthropic:opus]
+runners:
+  openai: {max_attempts: 3}
+  anthropic: {max_attempts: 3}
 output: {vault: ~/vault/jobs}
 limits: {max_agent_jobs_per_run: 40}   # overflow: FIFO; deferred jobs retry next run
 

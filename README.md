@@ -10,24 +10,25 @@ Cheap deterministic filters run first, dropping jobs before any agent tokens are
 
 ```
 INTAKE ──▶ DEDUP ──▶ HARD-FILTER ──▶ EXTRACT ──▶ DEDUP-FUZZY ──▶ SKILL-GAP ──▶ SCORE ──▶ PUBLISH
- (feeds +   (Python,  (Python,        (AGENT,     (Python,        (AGENT,       (AGENT,   (Python →
-  manual)    URL key)  keyword scan)   Haiku)      company+title)  Sonnet)       Opus)     Obsidian)
+ (feeds +   (Python,  (Python,        (AGENT      (Python,        (AGENT        (AGENT     (Python →
+  manual)    URL key)  keyword scan)   chain)      company+title)  chain)         chain)     Obsidian)
 ```
 
 1. **Intake** — feeds (Greenhouse/Lever/RSS) + manual URLs (`--url` flag and/or an inbox file) → raw listings.
 2. **Dedup** (Python) — drop anything in the seen-index (keyed by URL hash).
 3. **Hard-filter** (Python) — scan raw text for the blocklist before any agent spend.
-4. **Extract** (agent, Haiku) — normalize survivors → structured fields including numeric comp (`comp_min`/`comp_max`/`comp_currency`/`comp_period`).
+4. **Extract** (agent chain) — normalize survivors → structured fields including numeric comp (`comp_min`/`comp_max`/`comp_currency`/`comp_period`).
 5. **Post-extract dedup** (Python) — fuzzy key `normalize(company) + normalize(title) + normalize(location)` records the same role seen via different URLs. Record-only since the 2026-07-23 lean re-cut: a hit traces `possible duplicate` and the job continues — a duplicate note costs seconds of triage, a falsely-deduped posting is an application never made.
-6. **Skill-gap** (agent, Sonnet) — compare résumé/skills to requirements.
-7. **Score** (agent, Opus) — final fit judgment + rationale on the smallest surviving set.
+6. **Skill-gap** (agent chain) — compare résumé/skills to requirements.
+7. **Score** (agent chain) — final fit judgment + rationale on the smallest surviving set.
 8. **Publish** (Python) — write Obsidian note (score, gap, VEC fields).
 
 Every stage implements one interface, `run(job) -> job`. Rejected jobs short-circuit but are logged so you can see *why* and tune your profile.
 
 ## Quickstart
 
-**Prerequisites:** Python 3.11+, an Anthropic subscription (not API key — see below).
+**Prerequisites:** Python 3.11+, the `codex` and `claude` CLIs, and the
+ChatGPT/Codex and Claude Code subscriptions used by your configured chains.
 
 ```bash
 python3 -m venv .venv
@@ -47,29 +48,41 @@ $EDITOR config/profile.md       # paste your résumé, set blocklist, etc.
 $EDITOR config/pipeline.yaml    # set your vault path, sources, inbox file
 ```
 
-### Subscription billing guard
+### Subscription authentication and spending guards
 
-This project uses the **Claude Agent SDK with subscription auth** (OAuth token), *not* an API key. Before running, ensure `ANTHROPIC_API_KEY` is **unset** — if it is set, the SDK will bill against the API instead of your subscription and the runner will refuse to start.
-
-```bash
-unset ANTHROPIC_API_KEY   # must be absent
-```
-
-Log in to Claude Code so the SDK can pick up your subscription credentials:
+The built-in providers use local subscription authentication, not ordinary
+pay-as-you-go API access. Before running, unset provider API-key environment
+variables; each adapter refuses to start when its own API key is set:
 
 ```bash
-claude login   # or: claude   # already logged in if you use Claude Code
+unset ANTHROPIC_API_KEY OPENAI_API_KEY
 ```
+
+Authenticate each local client:
+
+```bash
+codex login    # choose ChatGPT authentication
+claude login   # Claude Code subscription
+```
+
+Keep Codex auto top-up disabled. This account-side setting cannot be enforced by
+the pipeline; enabling it may consume purchased credits after the included
+subscription allowance is used.
 
 ### Run the pipeline
 
 ```bash
 job-pipeline run                      # full run from configured sources + inbox
 job-pipeline run --url https://...    # process ONLY this URL (repeatable); sources/inbox skipped
-job-pipeline run --mock               # dry run using MockRunner — no tokens spent
-job-pipeline run --url https://... --mock   # test a specific URL without spending tokens
+job-pipeline run --mock               # offline preview using synthetic data; no saved changes
+job-pipeline run --url https://... --mock   # use URL as a preview identifier; it is not fetched
 job-pipeline run --url https://... --reprocess   # re-run a previously processed URL (clears its seen entry; add --force to also overwrite an edited note)
 ```
+
+`--mock` runs the built-in stages with synthetic listings and replies in a temporary
+vault. It skips configured sources and seeders, leaves the real inbox, registry, and
+seen-index untouched, and discards preview notes. Scores are placeholders.
+It cannot be combined with `--reprocess` or `--force`.
 
 Any URL passed via `--url` is processed this run only (not written to the inbox file). The
 **inbox file** (`manual.inbox` in `pipeline.yaml`) accepts one URL per line — drop links in
@@ -82,14 +95,26 @@ The pipeline has three seams designed to let you extend without touching core co
 
 ### 1. Config-driven stages
 
-`pipeline.yaml` lists stages by name, in order, with a model tier per agent stage:
+`pipeline.yaml` lists stages by name and an ordered `provider:model` fallback chain
+for every agent stage:
 
 ```yaml
 stages: [dedup, hard_filter, extract, dedup_fuzzy, skill_gap, score, publish]
-models: {extract: haiku, skill_gap: sonnet, score: opus}
+models:
+  extract: [openai:gpt-5.6-luna, anthropic:haiku]
+  skill_gap: [openai:gpt-5.6-luna, anthropic:sonnet]
+  score: [openai:gpt-5.6-terra, anthropic:opus]
+runners:
+  openai: {max_attempts: 3}
+  anthropic: {max_attempts: 3}
 ```
 
-Add, remove, or reorder stages with a config edit.
+Entries are tried left-to-right when a provider returns `RunnerError`. Providers
+start on first use; unavailable CLI/authentication falls through to the next entry.
+API-key billing guards remain errors and do not enable API access. Each provider
+owns its retry budget. Bare legacy values still work (`haiku` means
+`anthropic:haiku`), and `claude` is accepted as an alias for `anthropic`.
+Add, remove, or reorder stages and provider/model entries with a config edit.
 
 One optional stage ships disabled: add `score_floor` between `score` and `publish`
 (with `score_floor: 60` in `profile.md`) to keep below-floor jobs out of your vault.
@@ -206,7 +231,12 @@ batch (tracked as E3/E4), with no registry changes required on your part.
 
 Your real `config/profile.md`, `config/pipeline.yaml`, vault path, and seen-index are gitignored. The repo ships `*.example` templates — publish-safe from day one.
 
-`AgentRunner` is also swappable (SDK / mock / future `claude -p`) behind the same interface.
+Providers implement `AgentRunner.run(prompt, model, schema)` and register with
+`@register_runner("name")`. Provider failures that should activate the next chain
+entry must raise `RunnerError`; other exceptions are treated as implementation bugs.
+Built-in adapters live under `job_pipeline/runners/`. `--mock` bypasses configured
+providers and runs an offline preview with synthetic replies. CLI runs return a
+nonzero exit status when any job errors.
 
 ### Loosely formatted feeds (e.g. HN "Who is hiring?")
 
@@ -260,8 +290,8 @@ Note frontmatter carries three overlapping lifecycle fields, each with a distinc
 # Full suite — no network, no tokens (MockRunner)
 .venv/bin/pytest -v
 
-# Opt-in real-SDK integration test (hits the Agent SDK; requires subscription auth and unset ANTHROPIC_API_KEY)
+# Opt-in real-provider tests (consume subscription usage and require local authentication)
 .venv/bin/pytest -m integration -v
 ```
 
-The default `pytest` run excludes integration tests. All 68 rule/stage/orchestrator/store tests run in ~0.2 s.
+The default `pytest` run excludes integration tests. Real-provider integration tests require explicit opt-in; the default suite uses test doubles.
