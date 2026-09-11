@@ -1,17 +1,19 @@
 # Multi-Provider Runners & Model Fallback Chains — Design Spec
 
 **Date:** 2026-07-02
-**Status:** Approved for planning
+**Status:** Implemented on review branch; pending merge and live-provider verification (2026-09-11)
 **Depends on:** Stage Package Refactor spec (2026-07-02) — land that first; this spec's stage edits assume the `stages/agents/` package layout.
 
 ## Goal
 
 Let each agent stage run against an ordered fallback chain of `provider:model` pairs, configured in `pipeline.yaml`, so that:
 
-1. Forks can add a new provider (Codex, OpenCode, raw API, local models) by writing one adapter class and registering it — no core edits.
+1. Forks can add a new provider (raw API, local models) by writing one adapter class and registering it — no core edits.
 2. A stage survives a provider outage or usage-limit wall by falling through to the next chain entry (e.g. `claude:opus` → hypothetical `codex:gpt-5`).
 
-We ship exactly two providers: `claude` (the existing SDKRunner) and `mock` (tests/`--mock`). Third-party adapters are documentation, not code (YAGNI — and keeps the default install subscription-only with zero extra credentials).
+The implementation ships `anthropic` (`claude` alias), `openai`, and `mock`.
+The live providers use local Claude Code and ChatGPT/Codex authentication.
+OpenCode Go was removed after subscription cancellation on 2026-09-11.
 
 ## Config Syntax (binding)
 
@@ -19,17 +21,18 @@ We ship exactly two providers: `claude` (the existing SDKRunner) and `mock` (tes
 
 ```yaml
 models:
-  extract:   [claude:haiku]
-  skill_gap: [claude:sonnet]
-  score:     [claude:opus, claude:sonnet]     # fall back to sonnet if opus fails
-runners:                                      # optional per-provider constructor kwargs
-  claude: {max_attempts: 3}
+  extract:   [openai:gpt-5.6-luna, anthropic:haiku]
+  skill_gap: [openai:gpt-5.6-luna, anthropic:sonnet]
+  score:     [openai:gpt-5.6-terra, anthropic:opus]
+runners:
+  openai: {max_attempts: 3}
+  anthropic: {max_attempts: 3}
 ```
 
 **Backward compatibility:** the current shorthand must keep working. Normalization rules, applied by a pydantic validator at config load:
 
 - A bare string is a one-element chain: `extract: haiku` ≡ `extract: [haiku]`.
-- An entry without a `:` gets the default provider: `haiku` ≡ `claude:haiku`.
+- An entry without a `:` gets the default provider: `haiku` ≡ `anthropic:haiku`.
 - The existing example file (`models: {extract: haiku, skill_gap: sonnet, score: opus}`) parses identically to today's behavior.
 
 Malformed entries (`:model`, `provider:`, empty list, empty string) fail at load with a message naming the stage key — fail-fast like the rest of `config.py`.
@@ -79,7 +82,11 @@ ModelChain([(MockRunner([...]), "haiku")])
 
 `build_stages` gains a runner-resolution step:
 
-- Instantiate each provider **lazily and once per run**: only providers referenced by some stage's chain get constructed, with kwargs from `cfg.runners.get(provider, {})`.
+- Resolve provider names while building stages; unknown names fail before execution.
+- Instantiate each provider **lazily and once per run**, on its first actual use.
+  Missing CLI/authentication raises `RunnerError`, allowing fallback; startup
+  failures are cached for the rest of the run. Other exception types propagate.
+  `claude` and `anthropic` share one instance. Only started providers are closed.
 - `run_pipeline`'s `runner: AgentRunner` parameter becomes `runner_override: AgentRunner | None = None`. When set (tests, `--mock`), every chain entry uses it regardless of provider — this keeps `--mock` and the e2e tests trivial. When `None`, providers come from the registry.
 
 ### 7. Provider layout: the `runners/` package (binding)
@@ -89,16 +96,24 @@ Providers get the same predictable one-module-per-adapter layout as stages/sourc
 ```
 job_pipeline/runners/
   __init__.py     # imports every provider module (registration side-effect), __all__
-  claude.py       # SDKRunner moves here from core/sdk_runner.py, @register_runner("claude")
+  anthropic.py    # Claude Agent SDK; registers "anthropic" and compatibility alias "claude"
+  openai.py       # local Codex SDK with ChatGPT subscription-auth guard
   mock.py         # registers MockRunner as "mock" (class itself stays in core/runner.py —
                   #   it is a test double first; this module is just the registration)
 ```
 
-`core/sdk_runner.py` is removed (no shim — same clean-break policy as the source module split; `tests/test_sdk_runner.py` updates its import line, the only permitted test edit). The `ANTHROPIC_API_KEY` billing guard moves verbatim with the class — it protects the `claude` provider only; other providers own their own credential handling. `MockRunner` as `"mock"` is usable directly in yaml chains (e.g. dry-run configs). A fork adds a provider the same way it adds anything: copy `runners/claude.py` as the template, register a name, add one import line to `runners/__init__.py`, reference it as `provider:` in a model chain.
+`core/sdk_runner.py` is removed. The `ANTHROPIC_API_KEY` billing guard moves with
+the Anthropic adapter; OpenAI refuses API-key authentication. A fork adds another provider by copying the
+closest adapter, registering its name, importing it from `runners/__init__.py`, and
+referencing it in a model chain.
 
 ### 8. CLI
 
-`--mock` behavior unchanged from the user's view: passes `runner_override=MockRunner([])`.
+`--mock` runs an offline preview using synthetic listings and schema-specific
+replies. Sources and seeders are skipped; output and seen-index use a temporary
+directory and are discarded. Real inbox and registry files remain untouched.
+`--url` only supplies preview identifiers. `--force` and `--reprocess` are rejected
+in preview mode. Any errored jobs produce a nonzero CLI exit status.
 
 ## What `cost_tier` becomes
 
@@ -119,7 +134,7 @@ README gains a "Bring your own provider" section: the `AgentRunner` contract (ra
 
 ## Non-Goals
 
-- No shipped non-Claude adapter, no new dependencies, no async runners.
+- No async runners and no providers beyond the two subscription-backed adapters.
 - No per-entry timeout/budget knobs.
 - No orchestrator awareness of chains (it still sees stages; the AI-orchestrator seam is untouched).
 - No changes to `max_agent_jobs_per_run` accounting (a job entering agent stages counts once, regardless of fallbacks).

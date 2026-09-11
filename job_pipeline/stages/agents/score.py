@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from job_pipeline.config import Profile
 from job_pipeline.core.job import Job
 from job_pipeline.core.registry import register_stage
-from job_pipeline.core.runner import AgentRunner
+from job_pipeline.core.runner import ModelChain
 from job_pipeline.core.stage import StageSpec
 from job_pipeline.stages.agents.common import _fill
 
@@ -38,14 +38,14 @@ class ScoreStage:
                      produces=["score", "score_rationale"],
                      kind="agent", cost_tier="expensive")
 
-    def __init__(self, runner: AgentRunner, model: str, profile: Profile) -> None:
-        self.runner, self.model, self.profile = runner, model, profile
+    def __init__(self, chain: ModelChain, profile: Profile) -> None:
+        self.chain, self.profile = chain, profile
 
     def run(self, job: Job) -> Job:
         company_context = (
             f"COMPANY CONTEXT: {job.company_context}\n\n" if job.company_context else ""
         )
-        reply = self.runner.run(
+        reply = self.chain.run(
             _fill(
                 SCORE_PROMPT,
                 profile_body=self.profile.body,
@@ -54,7 +54,7 @@ class ScoreStage:
                 comp_text=job.comp_text, description=job.description,
                 skill_gap=job.skill_gap,
             ),
-            self.model, ScoreReply,
+            ScoreReply,
         )
         job.score, job.score_rationale = reply.score, reply.rationale
         job.add_trace("score", f"scored {reply.score}")

@@ -1,9 +1,10 @@
-"""Name -> class registries: the extensibility seam for stages/sources/seeders."""
+"""Name -> class registries: extensibility seams for pipeline components."""
 from __future__ import annotations
 
 _STAGES: dict[str, type] = {}
 _SOURCES: dict[str, type] = {}
 _SEEDERS: dict[str, type] = {}
+_RUNNERS: dict[str, type] = {}
 
 
 def _make_pair(table: dict[str, type], kind: str):
@@ -26,3 +27,4 @@ def _make_pair(table: dict[str, type], kind: str):
 register_stage, get_stage = _make_pair(_STAGES, "stage")
 register_source, get_source = _make_pair(_SOURCES, "source")
 register_seeder, get_seeder = _make_pair(_SEEDERS, "seeder")
+register_runner, get_runner = _make_pair(_RUNNERS, "runner")

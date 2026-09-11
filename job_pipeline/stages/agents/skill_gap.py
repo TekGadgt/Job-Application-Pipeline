@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from job_pipeline.config import Profile
 from job_pipeline.core.job import Job
 from job_pipeline.core.registry import register_stage
-from job_pipeline.core.runner import AgentRunner
+from job_pipeline.core.runner import ModelChain
 from job_pipeline.core.stage import StageSpec
 from job_pipeline.stages.agents.common import _fill
 
@@ -39,18 +39,18 @@ class SkillGapStage:
                      requires=["requirements", "description"], produces=["skill_gap"],
                      kind="agent", cost_tier="mid")
 
-    def __init__(self, runner: AgentRunner, model: str, profile: Profile) -> None:
-        self.runner, self.model, self.profile = runner, model, profile
+    def __init__(self, chain: ModelChain, profile: Profile) -> None:
+        self.chain, self.profile = chain, profile
 
     def run(self, job: Job) -> Job:
-        reply = self.runner.run(
+        reply = self.chain.run(
             _fill(
                 SKILL_GAP_PROMPT,
                 profile_body=self.profile.body,
                 requirements=job.requirements,
                 description=job.description,
             ),
-            self.model, SkillGapReply,
+            SkillGapReply,
         )
         job.skill_gap = reply.model_dump()
         job.add_trace("skill_gap", "analyzed")

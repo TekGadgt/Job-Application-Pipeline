@@ -21,7 +21,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--reprocess", action="store_true",
                      help="clear the seen-index entry for each --url before running")
     run.add_argument("--force", action="store_true", help="overwrite user-edited notes")
-    run.add_argument("--mock", action="store_true", help="dry run with a mock agent")
+    run.add_argument("--mock", action="store_true",
+                     help="offline preview with synthetic data and temporary output")
 
     imp = sub.add_parser("import", help="convert an existing tracker folder into pipeline notes")
     imp.add_argument("--config", type=Path, default=Path("config/pipeline.yaml"))
@@ -47,9 +48,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.reprocess and not args.url:
         parser.error("--reprocess requires --url (no blanket un-marking)")
+    if args.mock and (args.reprocess or args.force):
+        parser.error("--mock cannot be combined with --reprocess or --force")
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     cfg = load_pipeline_config(args.config)      # fail fast, before any tokens
+    profile = load_profile(args.profile)
+
+    if args.mock:
+        from job_pipeline.preview import run_preview
+        s = run_preview(cfg, profile, args.url)
+        print(f"preview: published={s.published} rejected={s.rejected} "
+              f"errored={s.errored} deferred={s.deferred}; synthetic data, no saved changes")
+        return 1 if s.errored else 0
 
     if args.reprocess:
         import hashlib
@@ -59,14 +70,6 @@ def main(argv: list[str] | None = None) -> int:
             was = seen.unmark(hashlib.sha256(url.encode()).hexdigest()[:16])
             logging.info("reprocessing %s (%s)", url, "was seen" if was else "was not seen")
         seen.close()
-    profile = load_profile(args.profile)
-
-    if args.mock:
-        from job_pipeline.core.runner import MockRunner
-        runner = MockRunner([])   # agent stages will error-isolate per job
-    else:
-        from job_pipeline.core.sdk_runner import SDKRunner
-        runner = SDKRunner()
 
     # --url means "process exactly these": skip configured sources (and the inbox)
     sources = None
@@ -74,9 +77,11 @@ def main(argv: list[str] | None = None) -> int:
         from job_pipeline.sources.manual import ManualSource
         sources = [ManualSource(urls=args.url)]
 
-    s = run_pipeline(cfg, profile, runner, sources=sources, force=args.force)
+    s = run_pipeline(
+        cfg, profile, sources=sources, force=args.force,
+    )
     print(f"published={s.published} rejected={s.rejected} "
           f"errored={s.errored} deferred={s.deferred}")
     for note in s.notes:
         print(f"  -> {note}")
-    return 0
+    return 1 if s.errored else 0

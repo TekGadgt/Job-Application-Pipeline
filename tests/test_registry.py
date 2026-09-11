@@ -2,6 +2,7 @@ import pytest
 from job_pipeline.core.registry import (
     register_stage, get_stage, register_source, get_source,
     register_seeder, get_seeder,
+    register_runner, get_runner,
 )
 from job_pipeline.core.stage import StageSpec
 
@@ -29,3 +30,11 @@ def test_source_and_seeder_registries_are_separate():
     assert get_source("src") is Src and get_seeder("seed") is Seed
     with pytest.raises(KeyError):
         get_source("seed")
+
+
+def test_runner_registry_is_separate():
+    @register_runner("demo-runner")
+    class DemoRunner: ...
+    assert get_runner("demo-runner") is DemoRunner
+    with pytest.raises(KeyError):
+        get_source("demo-runner")

@@ -1,8 +1,4 @@
-"""AgentRunner backed by the Claude Agent SDK (rides Claude Code subscription auth).
-
-Billing guard: a set ANTHROPIC_API_KEY silently flips the SDK to pay-as-you-go
-API credits. This project is subscription-only, so we refuse to start.
-"""
+"""Claude Agent SDK provider using Claude Code subscription authentication."""
 from __future__ import annotations
 
 import os
@@ -10,6 +6,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from job_pipeline.core.registry import register_runner
 from job_pipeline.core.runner import RunnerError, parse_json_reply
 
 T = TypeVar("T", bound=BaseModel)
@@ -20,7 +17,9 @@ SYSTEM_PROMPT = (
 )
 
 
-class SDKRunner:
+@register_runner("claude")
+@register_runner("anthropic")
+class AnthropicRunner:
     def __init__(self, max_attempts: int = 3) -> None:
         if os.environ.get("ANTHROPIC_API_KEY"):
             raise RuntimeError(
@@ -36,12 +35,13 @@ class SDKRunner:
             try:
                 reply = self._query(prompt, model)
                 return schema(**parse_json_reply(reply))
-            except (RunnerError, ValidationError) as e:
-                last_err = e
+            except (RunnerError, ValidationError) as exc:
+                last_err = exc
+            except Exception as exc:  # SDK transport/provider errors have no stable base class
+                last_err = RunnerError(f"Anthropic provider failed: {exc}")
         raise RunnerError(f"no valid reply after {self.max_attempts} attempts: {last_err}")
 
     def _query(self, prompt: str, model: str) -> str:
-        """All SDK/async plumbing lives here — the seam mocked in unit tests."""
         import anyio
         from claude_agent_sdk import (
             AssistantMessage, ClaudeAgentOptions, TextBlock, query,
@@ -63,3 +63,7 @@ class SDKRunner:
             return text
 
         return anyio.run(go)
+
+
+# Compatibility for older imports while the canonical provider name is anthropic.
+SDKRunner = AnthropicRunner
